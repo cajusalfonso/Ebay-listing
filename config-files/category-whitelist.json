@@ -1,0 +1,37 @@
+[
+  {
+    "name": "Haus & Garten",
+    "ebay_category_path": ["Haus & Garten"],
+    "notes": "Keine elektrischen Geräte. Möbel, Deko, Küchenhelfer (manuell), Gartenwerkzeug (manuell)."
+  },
+  {
+    "name": "Heimwerker",
+    "ebay_category_path": ["Heimwerker"],
+    "notes": "Nur Handwerkzeug, Befestigung, Farben-Zubehör. Keine Elektrowerkzeuge."
+  },
+  {
+    "name": "Baby",
+    "ebay_category_path": ["Baby"],
+    "notes": "Nur Spielzeug ab 3 Jahren, nicht-elektrisches Zubehör, Möbel. KEINE 0–36 Monate Produkte."
+  },
+  {
+    "name": "Sport & Freizeit",
+    "ebay_category_path": ["Sport"],
+    "notes": "Ohne Elektronik (keine Fitness-Tracker, keine E-Bikes)."
+  },
+  {
+    "name": "Haustierbedarf",
+    "ebay_category_path": ["Haustierbedarf"],
+    "notes": "Ohne Futter, Supplements, Arznei. Spielzeug, Transportboxen, Näpfe, Leinen."
+  },
+  {
+    "name": "Büro & Schreibwaren",
+    "ebay_category_path": ["Business & Industrie", "Büro"],
+    "notes": "Papier, Ordner, Stifte, nicht-elektrische Büroausstattung."
+  },
+  {
+    "name": "Auto & Motorrad",
+    "ebay_category_path": ["Auto & Motorrad"],
+    "notes": "Nur Zubehör ohne TÜV-relevante Ersatzteile. Keine Bremsen, keine Airbags, keine Motorteile."
+  }
+]

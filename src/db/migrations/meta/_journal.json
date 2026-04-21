@@ -1,0 +1,34 @@
+{
+  "version": "7",
+  "dialect": "postgresql",
+  "entries": [
+    {
+      "idx": 0,
+      "version": "7",
+      "when": 1776535090767,
+      "tag": "0000_whole_hobgoblin",
+      "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1776705345115,
+      "tag": "0001_safe_stone_men",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1776706515834,
+      "tag": "0002_overjoyed_nighthawk",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1776764327855,
+      "tag": "0003_short_human_robot",
+      "breakpoints": true
+    }
+  ]
+}

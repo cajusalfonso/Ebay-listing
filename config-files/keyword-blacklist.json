@@ -1,0 +1,13 @@
+{
+  "_comment": "Case-insensitive Regex-Patterns. Match gegen title + description + brand triggert Compliance-Blocker.",
+  "patterns": [
+    "\\b(batterie|batterien|akku|akkus|li-?ion|li-?po|aa batterien|aaa batterien|knopfzelle)\\b",
+    "\\b(kabelgebunden|netzteil|stecker|steckdose|stromkabel|ladeger[aä]t|usb kabel|ladekabel)\\b",
+    "\\b(creme|lotion|parfum|duschgel|shampoo|kosmetik|make-?up|lippenstift|nagellack)\\b",
+    "\\b(vitamin|vitamine|nahrungserg[aä]nzung|nahrungsmittel|tee|kaffee|lebensmittel|snack)\\b",
+    "\\b(medizin|arznei|arzneimittel|schmerzmittel|rezept|pharma|medizinprodukt)\\b",
+    "\\b(textil|textilien|bekleidung|jacke|shirt|t-shirt|hose|schuhe|stoff|socken|unterw[aä]sche)\\b",
+    "\\b(spielzeug ab 0|f[uü]r babys|0-36 monate|0-3 jahre|s[aä]ugling)\\b",
+    "\\b(bluetooth|wlan|wifi|elektrisch|elektronisch)\\b"
+  ]
+}

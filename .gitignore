@@ -1,0 +1,42 @@
+.next/
+# Dependencies
+node_modules/
+.pnpm-store/
+
+# Build output
+dist/
+*.tsbuildinfo
+
+# Test / coverage
+coverage/
+.vitest-cache/
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# Logs
+*.log
+npm-debug.log*
+pnpm-debug.log*
+
+# Runtime storage (product images etc.)
+storage/
+!storage/.gitkeep
+
+# Auto-generated at first run (contains resolved eBay category IDs)
+config-files/ebay-category-ids.json
+
+# IDE
+.vscode/
+.idea/
+*.swp
+.DS_Store
+
+# macOS
+.AppleDouble
+.LSOverride
+
+# tsx cache
+.tsx-cache/
