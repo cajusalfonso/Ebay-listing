@@ -41,6 +41,7 @@ COPY --from=build --chown=nextjs:nodejs /app/public ./public
 COPY --from=build --chown=nextjs:nodejs /app/src ./src
 COPY --from=build --chown=nextjs:nodejs /app/config-files ./config-files
 COPY --from=build --chown=nextjs:nodejs /app/drizzle.config.ts ./drizzle.config.ts
+COPY --from=build --chown=nextjs:nodejs /app/scripts ./scripts
 
 USER nextjs
 EXPOSE 3000
