@@ -1,10 +1,53 @@
 'use client';
 
-import { useActionState } from 'react';
+import { useState, useTransition } from 'react';
 import { Check, X, AlertTriangle, ExternalLink, Rocket, Eye } from 'lucide-react';
-import { runDryRunAction, type DryRunResult } from '../../app/(app)/dashboard/actions';
+// Types duplicated locally — importing from a 'use server' file (even as `type`)
+// can trigger Server Action bundler quirks that show up as generic error digests.
+interface ListingActionResult {
+  ok: boolean;
+  error?: string;
+  preview?: PreviewData;
+  publish?: PublishOutcome;
+}
 
-const initialState: DryRunResult = { ok: true };
+interface PreviewData {
+  title: string;
+  brand: string | null;
+  primarySource: string;
+  qualityScore: number;
+  suggestedCategoryId: string | null;
+  imageCount: number;
+  compliance: {
+    passed: boolean;
+    blockers: readonly string[];
+    warnings: readonly string[];
+  };
+  market: {
+    competitorCount: number;
+    lowestPriceEur: number | null;
+    medianPriceEur: number | null;
+    searchUrl: string;
+  };
+  pricing: {
+    decision: 'list' | 'skip' | 'manual_review';
+    reason: string;
+    recommendedPriceGross: number;
+    marketPosition: string;
+    profitEur: number;
+    marginPercent: number;
+  };
+}
+
+interface PublishOutcome {
+  published: boolean;
+  listingId: string | null;
+  listingUrl: string | null;
+  sku: string | null;
+  failureReason: string | null;
+}
+
+type Result = ListingActionResult;
 
 function formatEur(value: number | null): string {
   if (value === null) return '—';
@@ -15,7 +58,7 @@ function formatPercent(value: number): string {
   return `${(value * 100).toFixed(2)}%`;
 }
 
-function PreviewView({ preview }: { preview: NonNullable<DryRunResult['preview']> }) {
+function PreviewView({ preview }: { preview: NonNullable<Result['preview']> }) {
   const decisionColor =
     preview.pricing.decision === 'list'
       ? 'text-brand-700 bg-brand-50 border-brand-200'
@@ -137,7 +180,7 @@ function PreviewView({ preview }: { preview: NonNullable<DryRunResult['preview']
   );
 }
 
-function PublishOutcomeView({ publish }: { publish: NonNullable<DryRunResult['publish']> }) {
+function PublishOutcomeView({ publish }: { publish: NonNullable<Result['publish']> }) {
   if (publish.published && publish.listingUrl) {
     return (
       <div className="mt-4 rounded-md border border-brand-200 bg-brand-50 p-4">
@@ -173,14 +216,42 @@ function PublishOutcomeView({ publish }: { publish: NonNullable<DryRunResult['pu
 }
 
 export function CreateListingForm() {
-  const [state, formAction, isPending] = useActionState<DryRunResult, FormData>(
-    async (_prev, formData) => runDryRunAction(formData),
-    initialState
-  );
+  const [result, setResult] = useState<Result>({ ok: true });
+  const [isPending, startTransition] = useTransition();
+
+  const submit = (ean: string, cogs: string, publish: boolean) => {
+    startTransition(async () => {
+      try {
+        const response = await fetch('/api/listings/run', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ ean, cogs: Number(cogs), publish }),
+        });
+        const json = (await response.json()) as Result;
+        setResult(json);
+      } catch (error) {
+        setResult({
+          ok: false,
+          error: `Request failed: ${error instanceof Error ? error.message : String(error)}`,
+        });
+      }
+    });
+  };
 
   return (
     <div>
-      <form action={formAction} className="card space-y-4">
+      <form
+        className="card space-y-4"
+        onSubmit={(event) => {
+          event.preventDefault();
+          const form = event.currentTarget;
+          const ean = (form.elements.namedItem('ean') as HTMLInputElement).value;
+          const cogs = (form.elements.namedItem('cogs') as HTMLInputElement).value;
+          const submitter = (event.nativeEvent as SubmitEvent).submitter as HTMLButtonElement | null;
+          const publish = submitter?.name === 'publish';
+          submit(ean, cogs, publish);
+        }}
+      >
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
           <div>
             <label htmlFor="ean" className="mb-1 block text-sm font-medium text-gray-700">
@@ -213,9 +284,9 @@ export function CreateListingForm() {
           </div>
         </div>
 
-        {state.error ? (
+        {result.error ? (
           <div className="rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-700">
-            {state.error}
+            {result.error}
           </div>
         ) : null}
 
@@ -227,17 +298,11 @@ export function CreateListingForm() {
             Sandbox.
           </p>
           <div className="flex items-center gap-2">
-            <button type="submit" disabled={isPending} className="btn-secondary">
+            <button type="submit" name="preview" disabled={isPending} className="btn-secondary">
               <Eye size={16} />
               {isPending ? 'Running…' : 'Preview'}
             </button>
-            <button
-              type="submit"
-              name="publish"
-              value="true"
-              disabled={isPending}
-              className="btn-primary"
-            >
+            <button type="submit" name="publish" disabled={isPending} className="btn-primary">
               <Rocket size={16} />
               {isPending ? 'Running…' : 'Publish'}
             </button>
@@ -245,8 +310,8 @@ export function CreateListingForm() {
         </div>
       </form>
 
-      {state.publish ? <PublishOutcomeView publish={state.publish} /> : null}
-      {state.preview ? <PreviewView preview={state.preview} /> : null}
+      {result.publish ? <PublishOutcomeView publish={result.publish} /> : null}
+      {result.preview ? <PreviewView preview={result.preview} /> : null}
     </div>
   );
 }
