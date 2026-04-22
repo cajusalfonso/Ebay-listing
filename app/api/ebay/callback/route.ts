@@ -3,6 +3,7 @@ import { NextResponse } from 'next/server';
 import { db } from '../../../../lib/db';
 import { auth } from '../../../../lib/auth';
 import { getEncryptionKey } from '../../../../lib/encryption-key';
+import { publicUrl } from '../../../../lib/public-url';
 import { buildUserOauthClient } from '../../../../lib/user-clients';
 import { createUserTokenStore } from '../../../../src/modules/ebay/userTokenStore';
 import { STATE_COOKIE, ENV_COOKIE, verifyState } from '../connect/route';
@@ -19,7 +20,7 @@ import { STATE_COOKIE, ENV_COOKIE, verifyState } from '../connect/route';
  */
 export async function GET(req: Request): Promise<Response> {
   const url = new URL(req.url);
-  const settingsUrl = new URL('/settings', req.url);
+  const settingsUrl = publicUrl(req, '/settings');
 
   const session = await auth();
   if (!session?.user?.id) {

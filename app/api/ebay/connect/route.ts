@@ -2,6 +2,7 @@ import { randomUUID, timingSafeEqual } from 'node:crypto';
 import { cookies } from 'next/headers';
 import { NextResponse } from 'next/server';
 import { auth } from '../../../../lib/auth';
+import { publicUrl } from '../../../../lib/public-url';
 import { buildUserOauthClient, MissingCredentialsError } from '../../../../lib/user-clients';
 
 const STATE_COOKIE_NAME = 'ebay_oauth_state';
@@ -21,7 +22,7 @@ const ENV_COOKIE_NAME = 'ebay_oauth_env';
 export async function GET(req: Request): Promise<Response> {
   const session = await auth();
   if (!session?.user?.id) {
-    return NextResponse.redirect(new URL('/auth/login', req.url));
+    return NextResponse.redirect(publicUrl(req, '/auth/login'));
   }
   const userId = Number.parseInt(session.user.id, 10);
 
@@ -34,7 +35,7 @@ export async function GET(req: Request): Promise<Response> {
     oauth = await buildUserOauthClient(userId, ebayEnv);
   } catch (error) {
     if (error instanceof MissingCredentialsError) {
-      const redirect = new URL('/settings', req.url);
+      const redirect = publicUrl(req, '/settings');
       redirect.searchParams.set('error', 'missing_credentials');
       return NextResponse.redirect(redirect);
     }

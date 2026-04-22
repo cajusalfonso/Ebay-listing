@@ -21,7 +21,16 @@ export default auth((req) => {
   if (isPublic) return NextResponse.next();
 
   if (!req.auth) {
-    const loginUrl = new URL('/auth/login', req.url);
+    const authUrl = process.env.AUTH_URL;
+    const forwardedHost = req.headers.get('x-forwarded-host');
+    const forwardedProto = req.headers.get('x-forwarded-proto') ?? 'https';
+    const base =
+      authUrl && authUrl.length > 0
+        ? authUrl
+        : forwardedHost
+          ? `${forwardedProto}://${forwardedHost}`
+          : req.url;
+    const loginUrl = new URL('/auth/login', base);
     loginUrl.searchParams.set('callbackUrl', pathname);
     return NextResponse.redirect(loginUrl);
   }
