@@ -18,6 +18,8 @@ const refreshResponseSchema = z.object({
   token_type: z.string(),
 });
 
+const APP_ACCESS_SCOPE = 'https://api.ebay.com/oauth/scope';
+
 export interface EbayOAuthConfig {
   readonly environment: EbayEnvironment;
   /** eBay `App ID (Client ID)` from the dev dashboard. */
@@ -40,6 +42,12 @@ export interface EbayOAuthClient {
   exchangeCodeForTokens(code: string): Promise<EbayTokenPair>;
   /** Exchange a long-lived refresh token for a fresh access token. */
   refreshAccessToken(refreshToken: string): Promise<EbayAccessTokenRefreshed>;
+  /**
+   * Get an application-level access token via `client_credentials`. Used for
+   * public APIs like Browse that don't need user consent. Default scope
+   * `https://api.ebay.com/oauth/scope` covers Buy Browse Search endpoints.
+   */
+  getApplicationAccessToken(): Promise<EbayAccessTokenRefreshed>;
 }
 
 function buildBasicAuthHeader(appId: string, certId: string): string {
@@ -118,6 +126,27 @@ export function createEbayOAuthClient(config: EbayOAuthConfig): EbayOAuthClient 
       const parsed = refreshResponseSchema.safeParse(json);
       if (!parsed.success) {
         throw new EbayAuthError('Refresh response schema mismatch', {
+          issues: parsed.error.issues,
+          response: json,
+        });
+      }
+      const now = Date.now();
+      return {
+        accessToken: parsed.data.access_token,
+        accessTokenExpiresAt: new Date(now + parsed.data.expires_in * 1_000),
+      };
+    },
+
+    async getApplicationAccessToken(): Promise<EbayAccessTokenRefreshed> {
+      const json = await postTokenRequest(
+        new URLSearchParams({
+          grant_type: 'client_credentials',
+          scope: APP_ACCESS_SCOPE,
+        })
+      );
+      const parsed = refreshResponseSchema.safeParse(json);
+      if (!parsed.success) {
+        throw new EbayAuthError('Client credentials response schema mismatch', {
           issues: parsed.error.issues,
           response: json,
         });

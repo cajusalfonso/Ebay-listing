@@ -40,6 +40,7 @@ function stubOAuth(refreshImpl?: EbayOAuthClient['refreshAccessToken']): EbayOAu
           accessToken: 'refreshed-access',
           accessTokenExpiresAt: new Date(Date.now() + 7_200_000),
         })),
+    getApplicationAccessToken: () => Promise.reject(new Error('not used')),
   };
 }
 

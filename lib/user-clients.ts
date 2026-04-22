@@ -134,6 +134,33 @@ export async function isEbayConnected(
  * logic around a `UserTokenStore`. Throws `MissingCredentialsError` if the
  * user has not completed setup.
  */
+// Simple per-process cache of app-level access tokens. Tokens expire after
+// ~2h; we refresh 60s before expiry to avoid mid-request invalidation.
+const appTokenCache = new Map<string, { token: string; expiresAt: number }>();
+
+function appTokenCacheKey(userId: number, env: EbayEnvironment): string {
+  return `${userId}:${env}`;
+}
+
+async function getAppAccessToken(
+  userId: number,
+  env: EbayEnvironment,
+  oauthClient: ReturnType<typeof createEbayOAuthClient>
+): Promise<string> {
+  const cacheKey = appTokenCacheKey(userId, env);
+  const cached = appTokenCache.get(cacheKey);
+  const now = Date.now();
+  if (cached && cached.expiresAt - 60_000 > now) {
+    return cached.token;
+  }
+  const fresh = await oauthClient.getApplicationAccessToken();
+  appTokenCache.set(cacheKey, {
+    token: fresh.accessToken,
+    expiresAt: fresh.accessTokenExpiresAt.getTime(),
+  });
+  return fresh.accessToken;
+}
+
 export async function buildUserHttpClient(
   userId: number,
   ebayEnv: EbayEnvironment
@@ -157,11 +184,18 @@ export async function buildUserHttpClient(
     environment: ebayEnv,
     getAccessToken: () => getValidAccessToken({ store, oauthClient, environment: ebayEnv }),
   });
+  // Browse API uses an application-level token (client_credentials grant)
+  // instead of the user-level one because Buy.Browse scopes aren't granted
+  // to regular sellers. The default scope works for public search endpoints.
+  const browseHttp = createEbayHttpClient({
+    environment: ebayEnv,
+    getAccessToken: () => getAppAccessToken(userId, ebayEnv, oauthClient),
+  });
   return {
     http,
     taxonomy: createTaxonomyClient(http),
     catalog: createCatalogClient(http),
-    browse: createBrowseClient(http),
+    browse: createBrowseClient(browseHttp),
     credentials: creds,
   };
 }
