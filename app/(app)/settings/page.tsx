@@ -17,28 +17,102 @@ interface PageProps {
   searchParams: Promise<{ connected?: string; error?: string }>;
 }
 
-export default async function SettingsPage({ searchParams }: PageProps) {
-  const session = await auth();
-  const userId = Number.parseInt(session?.user?.id ?? '0', 10);
+type LoadResult =
+  | {
+      ok: true;
+      userId: number;
+      existing: Awaited<ReturnType<typeof getCredentialsMaskedForUser>>;
+      connection: { connected: boolean; accessExpiresAt: Date | null; refreshExpiresAt: Date | null };
+    }
+  | { ok: false; where: string; message: string; stack?: string | undefined };
+
+async function loadPageData(): Promise<LoadResult> {
+  let userId: number;
+  try {
+    const session = await auth();
+    userId = Number.parseInt(session?.user?.id ?? '0', 10);
+  } catch (error) {
+    const e = error as Error;
+    return { ok: false, where: 'auth()', message: e.message || String(e), stack: e.stack };
+  }
+
   const ebayEnv: 'sandbox' | 'production' = 'sandbox';
 
-  const [existingResult, connectionResult] = await Promise.allSettled([
-    getCredentialsMaskedForUser(ebayEnv),
-    isEbayConnected(userId, ebayEnv),
-  ]);
-  const existing = existingResult.status === 'fulfilled' ? existingResult.value : null;
-  const connection =
-    connectionResult.status === 'fulfilled'
-      ? connectionResult.value
-      : { connected: false, accessExpiresAt: null, refreshExpiresAt: null };
-  const loadError =
-    existingResult.status === 'rejected'
-      ? `Credentials: ${(existingResult.reason as Error)?.message ?? String(existingResult.reason)}`
-      : connectionResult.status === 'rejected'
-        ? `Connection: ${(connectionResult.reason as Error)?.message ?? String(connectionResult.reason)}`
-        : null;
+  let existing: Awaited<ReturnType<typeof getCredentialsMaskedForUser>> = null;
+  try {
+    existing = await getCredentialsMaskedForUser(ebayEnv);
+  } catch (error) {
+    const e = error as Error;
+    return {
+      ok: false,
+      where: 'getCredentialsMaskedForUser',
+      message: e.message || String(e),
+      stack: e.stack,
+    };
+  }
 
+  let connection: {
+    connected: boolean;
+    accessExpiresAt: Date | null;
+    refreshExpiresAt: Date | null;
+  };
+  try {
+    connection = await isEbayConnected(userId, ebayEnv);
+  } catch (error) {
+    const e = error as Error;
+    return {
+      ok: false,
+      where: 'isEbayConnected',
+      message: e.message || String(e),
+      stack: e.stack,
+    };
+  }
+
+  return { ok: true, userId, existing, connection };
+}
+
+export default async function SettingsPage({ searchParams }: PageProps) {
+  const loaded = await loadPageData();
   const params = await searchParams;
+  const ebayEnv: 'sandbox' | 'production' = 'sandbox';
+
+  if (!loaded.ok) {
+    return (
+      <div className="mx-auto max-w-3xl space-y-4">
+        <h1 className="text-2xl font-semibold text-red-700">Settings: Load-Fehler</h1>
+        <div className="rounded-md border border-red-200 bg-red-50 p-4 text-sm">
+          <div className="mb-2">
+            <span className="font-semibold">Stelle:</span>{' '}
+            <code className="font-mono text-xs">{loaded.where}</code>
+          </div>
+          <div className="mb-2">
+            <span className="font-semibold">Message:</span>
+            <pre className="mt-1 whitespace-pre-wrap break-all font-mono text-xs text-red-900">
+              {loaded.message}
+            </pre>
+          </div>
+          {loaded.stack ? (
+            <div>
+              <span className="font-semibold">Stack:</span>
+              <pre className="mt-1 max-h-96 overflow-auto whitespace-pre-wrap break-all rounded bg-white p-2 font-mono text-[10px] text-gray-800">
+                {loaded.stack}
+              </pre>
+            </div>
+          ) : null}
+        </div>
+        <div className="flex gap-2">
+          <a href="/settings" className="btn-primary">
+            Erneut laden
+          </a>
+          <a href="/auth/login" className="btn-secondary">
+            Neu einloggen
+          </a>
+        </div>
+      </div>
+    );
+  }
+
+  const { existing, connection } = loaded;
   const connectedEnv = params.connected;
   const errorCode = params.error;
   const errorMessage = errorCode
@@ -63,12 +137,6 @@ export default async function SettingsPage({ searchParams }: PageProps) {
       {errorMessage ? (
         <div className="rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-700">
           {errorMessage}
-        </div>
-      ) : null}
-      {loadError ? (
-        <div className="rounded-md border border-orange-200 bg-orange-50 p-3 text-xs text-orange-900">
-          <div className="mb-1 font-semibold">⚠ Teilweise Load-Fehler:</div>
-          <pre className="whitespace-pre-wrap break-all font-mono">{loadError}</pre>
         </div>
       ) : null}
 
