@@ -1,6 +1,7 @@
 import { auth } from '../../../lib/auth';
 import { CredentialsForm } from '../../../components/forms/CredentialsForm';
 import { EbayConnectCard } from '../../../components/forms/EbayConnectCard';
+import { EbayManualTokenForm } from '../../../components/forms/EbayManualTokenForm';
 import { isEbayConnected } from '../../../lib/user-clients';
 import { getCredentialsMaskedForUser } from './actions';
 
@@ -75,6 +76,8 @@ export default async function SettingsPage({ searchParams }: PageProps) {
         accessExpiresAt={connection.accessExpiresAt}
         refreshExpiresAt={connection.refreshExpiresAt}
       />
+
+      <EbayManualTokenForm ebayEnv={ebayEnv} />
     </div>
   );
 }

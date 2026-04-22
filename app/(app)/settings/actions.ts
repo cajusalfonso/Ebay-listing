@@ -5,6 +5,7 @@ import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
 import { userCredentials } from '../../../src/db/schema';
 import { encrypt, decrypt } from '../../../src/lib/encryption';
+import { createUserTokenStore } from '../../../src/modules/ebay/userTokenStore';
 import { auth } from '../../../lib/auth';
 import { db } from '../../../lib/db';
 import { getEncryptionKey } from '../../../lib/encryption-key';
@@ -232,6 +233,61 @@ const FIELD_TO_COLUMN: Record<RevealableField, keyof typeof userCredentials.$inf
   icecatPassword: 'icecatPasswordEncrypted',
   discordWebhookUrl: 'discordWebhookUrlEncrypted',
 };
+
+/**
+ * Escape hatch for eBay OAuth setup issues. Lets the user paste tokens
+ * generated manually via developer.ebay.com's "Get a User Token Here" page
+ * (OAuth flow), bypassing our own connect/callback roundtrip. Useful when
+ * the RuName's OAuth redirect URL refuses to persist in eBay's portal.
+ *
+ * Access tokens live 2h on Sandbox, refresh tokens live 18 months. We use
+ * those as defaults if the user doesn't provide explicit expiry times.
+ */
+const manualTokensSchema = z.object({
+  ebayEnv: z.enum(['sandbox', 'production']),
+  accessToken: z.string().trim().min(20, 'Access Token zu kurz.'),
+  refreshToken: z.string().trim().min(20, 'Refresh Token zu kurz.'),
+  accessTokenExpiresInSeconds: z.coerce.number().int().positive().optional(),
+  refreshTokenExpiresInSeconds: z.coerce.number().int().positive().optional(),
+});
+
+export async function importManualEbayTokensAction(
+  formData: FormData
+): Promise<CredentialsSaveResult> {
+  const session = await auth();
+  if (!session?.user?.id) return { ok: false, error: 'Nicht eingeloggt.' };
+  const userId = Number.parseInt(session.user.id, 10);
+
+  const parsed = manualTokensSchema.safeParse({
+    ebayEnv: formData.get('ebayEnv'),
+    accessToken: formData.get('accessToken'),
+    refreshToken: formData.get('refreshToken'),
+    accessTokenExpiresInSeconds: formData.get('accessTokenExpiresInSeconds') || undefined,
+    refreshTokenExpiresInSeconds: formData.get('refreshTokenExpiresInSeconds') || undefined,
+  });
+  if (!parsed.success) {
+    return { ok: false, error: parsed.error.issues[0]?.message ?? 'Ungültige Eingabe' };
+  }
+
+  const accessExpiresInSec = parsed.data.accessTokenExpiresInSeconds ?? 7200; // 2h default
+  const refreshExpiresInSec = parsed.data.refreshTokenExpiresInSeconds ?? 60 * 60 * 24 * 547; // 18mo default
+  const now = Date.now();
+
+  const key = getEncryptionKey();
+  const store = createUserTokenStore(db, userId, key);
+  await store.save(parsed.data.ebayEnv, {
+    accessToken: parsed.data.accessToken,
+    refreshToken: parsed.data.refreshToken,
+    accessTokenExpiresAt: new Date(now + accessExpiresInSec * 1000),
+    refreshTokenExpiresAt: new Date(now + refreshExpiresInSec * 1000),
+  });
+
+  revalidatePath('/settings');
+  return {
+    ok: true,
+    message: `Tokens gespeichert (${parsed.data.ebayEnv}). Access gültig ${Math.floor(accessExpiresInSec / 60)} min, Refresh ${Math.floor(refreshExpiresInSec / 86400)} Tage.`,
+  };
+}
 
 export async function revealCredentialAction(
   ebayEnv: 'sandbox' | 'production',
