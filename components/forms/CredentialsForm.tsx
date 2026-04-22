@@ -84,7 +84,11 @@ function SecretField(props: {
         id={props.name}
         name={props.name}
         type="password"
-        autoComplete="off"
+        autoComplete="new-password"
+        data-1p-ignore
+        data-lpignore="true"
+        data-form-type="other"
+        spellCheck={false}
         className="input"
         placeholder={props.alreadySet ? 'Leerlassen zum Beibehalten' : '••••••••'}
       />
@@ -110,7 +114,16 @@ export function CredentialsForm({ existing }: { existing: ExistingState }) {
   );
 
   return (
-    <form action={formAction} className="space-y-6">
+    <form action={formAction} className="space-y-6" autoComplete="off">
+      {/* Decoy fields to absorb Chrome's autofill — without these, the browser
+          happily jams the user's saved Icecat username into the eBay App ID
+          field, silently overwriting it on every save. Must be rendered, just
+          kept off-screen. */}
+      <div aria-hidden="true" style={{ position: 'absolute', left: '-10000px', top: 'auto', width: '1px', height: '1px', overflow: 'hidden' }}>
+        <input type="text" name="fake-username" tabIndex={-1} autoComplete="username" />
+        <input type="password" name="fake-password" tabIndex={-1} autoComplete="current-password" />
+      </div>
+
       {/* eBay Env toggle */}
       <div className="card">
         <h2 className="mb-1 text-lg font-semibold text-gray-900">eBay Environment</h2>

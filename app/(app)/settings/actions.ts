@@ -11,10 +11,21 @@ import { db } from '../../../lib/db';
 import { getEncryptionKey } from '../../../lib/encryption-key';
 import { buildUserOauthClient, MissingCredentialsError } from '../../../lib/user-clients';
 
+// eBay App/Cert/Dev IDs follow a recognizable pattern: long strings with
+// multiple dashes, containing SBX or PRD. Reject anything that clearly isn't
+// one (e.g. a browser autofilling the Icecat username into this field).
+const ebayIdPattern = z
+  .string()
+  .trim()
+  .refine(
+    (v) => v === '' || (v.length >= 20 && v.includes('-')),
+    'Sieht nicht aus wie eine eBay Credential (min. 20 Zeichen mit Bindestrichen). Evtl. Browser-Autofill — erneut eintippen.'
+  );
+
 const credentialsSchema = z.object({
   ebayEnv: z.enum(['sandbox', 'production']),
-  ebayAppId: z.string().trim().min(1).optional().or(z.literal('')),
-  ebayCertId: z.string().trim().min(1).optional().or(z.literal('')),
+  ebayAppId: ebayIdPattern.optional().or(z.literal('')),
+  ebayCertId: ebayIdPattern.optional().or(z.literal('')),
   ebayDevId: z.string().trim().min(1).optional().or(z.literal('')),
   ebayRedirectUriName: z.string().trim().optional().or(z.literal('')),
   icecatUser: z.string().trim().optional().or(z.literal('')),
