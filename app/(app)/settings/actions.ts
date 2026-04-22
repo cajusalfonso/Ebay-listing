@@ -4,7 +4,7 @@ import { eq, and } from 'drizzle-orm';
 import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
 import { userCredentials } from '../../../src/db/schema';
-import { encrypt } from '../../../src/lib/encryption';
+import { encrypt, decrypt } from '../../../src/lib/encryption';
 import { auth } from '../../../lib/auth';
 import { db } from '../../../lib/db';
 import { getEncryptionKey } from '../../../lib/encryption-key';
@@ -144,4 +144,50 @@ export async function getCredentialsMaskedForUser(
     ebayRedirectUriName: row.ebayRedirectUriName ?? '',
     merchantLocationKey: row.merchantLocationKey ?? '',
   };
+}
+
+export type RevealableField =
+  | 'ebayAppId'
+  | 'ebayCertId'
+  | 'ebayDevId'
+  | 'icecatUser'
+  | 'icecatPassword'
+  | 'discordWebhookUrl';
+
+const FIELD_TO_COLUMN: Record<RevealableField, keyof typeof userCredentials.$inferSelect> = {
+  ebayAppId: 'ebayAppIdEncrypted',
+  ebayCertId: 'ebayCertIdEncrypted',
+  ebayDevId: 'ebayDevIdEncrypted',
+  icecatUser: 'icecatUserEncrypted',
+  icecatPassword: 'icecatPasswordEncrypted',
+  discordWebhookUrl: 'discordWebhookUrlEncrypted',
+};
+
+export async function revealCredentialAction(
+  ebayEnv: 'sandbox' | 'production',
+  field: RevealableField
+): Promise<{ ok: true; value: string } | { ok: false; error: string }> {
+  const session = await auth();
+  if (!session?.user?.id) return { ok: false, error: 'Nicht eingeloggt.' };
+  const userId = Number.parseInt(session.user.id, 10);
+
+  const rows = await db
+    .select()
+    .from(userCredentials)
+    .where(and(eq(userCredentials.userId, userId), eq(userCredentials.ebayEnv, ebayEnv)))
+    .limit(1);
+  const row = rows[0];
+  if (!row) return { ok: false, error: 'Keine Credentials gespeichert.' };
+
+  const column = FIELD_TO_COLUMN[field];
+  const encrypted = row[column] as string | null;
+  if (!encrypted) return { ok: false, error: 'Feld ist leer.' };
+
+  try {
+    const key = getEncryptionKey();
+    const plain = decrypt(encrypted, key);
+    return { ok: true, value: plain };
+  } catch {
+    return { ok: false, error: 'Entschlüsselung fehlgeschlagen.' };
+  }
 }

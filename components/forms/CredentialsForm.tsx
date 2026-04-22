@@ -1,10 +1,12 @@
 'use client';
 
-import { useActionState, useState } from 'react';
-import { Check } from 'lucide-react';
+import { useActionState, useState, useTransition } from 'react';
+import { Check, Eye, EyeOff } from 'lucide-react';
 import {
   saveCredentialsAction,
+  revealCredentialAction,
   type CredentialsSaveResult,
+  type RevealableField,
 } from '../../app/(app)/settings/actions';
 
 interface ExistingState {
@@ -25,18 +27,58 @@ function SecretField(props: {
   name: string;
   alreadySet: boolean;
   helpText?: string;
+  revealField?: RevealableField;
+  ebayEnv: 'sandbox' | 'production';
 }) {
+  const [revealed, setRevealed] = useState<string | null>(null);
+  const [revealError, setRevealError] = useState<string | null>(null);
+  const [isRevealing, startReveal] = useTransition();
+
+  const canReveal = props.alreadySet && props.revealField !== undefined;
+
+  const handleToggleReveal = () => {
+    if (revealed !== null) {
+      setRevealed(null);
+      setRevealError(null);
+      return;
+    }
+    if (!props.revealField) return;
+    startReveal(async () => {
+      setRevealError(null);
+      const result = await revealCredentialAction(props.ebayEnv, props.revealField!);
+      if (result.ok) {
+        setRevealed(result.value);
+      } else {
+        setRevealError(result.error);
+      }
+    });
+  };
+
   return (
     <div>
       <div className="mb-1 flex items-center justify-between">
         <label htmlFor={props.name} className="text-sm font-medium text-gray-700">
           {props.label}
         </label>
-        {props.alreadySet ? (
-          <span className="inline-flex items-center gap-1 rounded-full bg-brand-50 px-2 py-0.5 text-xs font-medium text-brand-700">
-            <Check size={12} /> gespeichert
-          </span>
-        ) : null}
+        <div className="flex items-center gap-2">
+          {canReveal ? (
+            <button
+              type="button"
+              onClick={handleToggleReveal}
+              disabled={isRevealing}
+              className="inline-flex items-center gap-1 rounded-md border border-gray-200 bg-white px-2 py-0.5 text-xs font-medium text-gray-600 hover:bg-gray-50 disabled:opacity-50"
+              aria-label={revealed ? 'Verbergen' : 'Anzeigen'}
+            >
+              {revealed ? <EyeOff size={12} /> : <Eye size={12} />}
+              {isRevealing ? 'Lade…' : revealed ? 'Verbergen' : 'Anzeigen'}
+            </button>
+          ) : null}
+          {props.alreadySet ? (
+            <span className="inline-flex items-center gap-1 rounded-full bg-brand-50 px-2 py-0.5 text-xs font-medium text-brand-700">
+              <Check size={12} /> gespeichert
+            </span>
+          ) : null}
+        </div>
       </div>
       <input
         id={props.name}
@@ -46,6 +88,15 @@ function SecretField(props: {
         className="input"
         placeholder={props.alreadySet ? 'Leerlassen zum Beibehalten' : '••••••••'}
       />
+      {revealed !== null ? (
+        <div className="mt-1 rounded-md border border-gray-200 bg-gray-50 px-3 py-2 text-xs">
+          <div className="mb-1 text-gray-500">Aktuell gespeichert:</div>
+          <code className="break-all font-mono text-gray-900">{revealed}</code>
+        </div>
+      ) : null}
+      {revealError ? (
+        <p className="mt-1 text-xs text-red-600">{revealError}</p>
+      ) : null}
       {props.helpText ? <p className="mt-1 text-xs text-gray-500">{props.helpText}</p> : null}
     </div>
   );
@@ -111,16 +162,22 @@ export function CredentialsForm({ existing }: { existing: ExistingState }) {
             label="eBay App ID (Client ID)"
             name="ebayAppId"
             alreadySet={existing.hasEbayAppId}
+            revealField="ebayAppId"
+            ebayEnv={env}
           />
           <SecretField
             label="eBay Cert ID (Client Secret)"
             name="ebayCertId"
             alreadySet={existing.hasEbayCertId}
+            revealField="ebayCertId"
+            ebayEnv={env}
           />
           <SecretField
             label="eBay Dev ID"
             name="ebayDevId"
             alreadySet={existing.hasEbayDevId}
+            revealField="ebayDevId"
+            ebayEnv={env}
           />
           <div>
             <label
@@ -182,11 +239,15 @@ export function CredentialsForm({ existing }: { existing: ExistingState }) {
             label="Icecat User"
             name="icecatUser"
             alreadySet={existing.hasIcecatUser}
+            revealField="icecatUser"
+            ebayEnv={env}
           />
           <SecretField
             label="Icecat Password"
             name="icecatPassword"
             alreadySet={existing.hasIcecatPassword}
+            revealField="icecatPassword"
+            ebayEnv={env}
           />
         </div>
       </div>
@@ -200,6 +261,8 @@ export function CredentialsForm({ existing }: { existing: ExistingState }) {
           label="Discord Webhook URL"
           name="discordWebhookUrl"
           alreadySet={existing.hasDiscordWebhook}
+          revealField="discordWebhookUrl"
+          ebayEnv={env}
           helpText="Server → Channel Settings → Integrations → Webhooks → New Webhook"
         />
       </div>
