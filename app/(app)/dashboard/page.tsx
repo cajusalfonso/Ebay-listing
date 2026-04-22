@@ -7,7 +7,43 @@ import { CreateListingForm } from '../../../components/forms/CreateListingForm';
 import { safeLoad } from '../../../lib/safe-load';
 import { LoadErrorPanel } from '../../../components/ui/LoadErrorPanel';
 
-export default async function DashboardPage() {
+const BUILD_MARKER = 'dashboard-v3-safe';
+
+export default async function DashboardPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ debug?: string }>;
+}) {
+  const params = await searchParams;
+
+  // Allow ?debug=minimal to render a skeleton without any loaders/children — this
+  // proves whether the layout + middleware work and isolates whether the crash
+  // is in loaders vs. the CreateListingForm client component.
+  if (params.debug === 'minimal') {
+    return (
+      <div className="mx-auto max-w-5xl space-y-4">
+        <h1 className="text-2xl font-semibold text-gray-900">Dashboard (minimal)</h1>
+        <div className="card">
+          <p className="text-sm text-gray-700">
+            Build marker: <code className="font-mono text-xs">{BUILD_MARKER}</code>
+          </p>
+          <p className="mt-2 text-sm text-gray-700">
+            If you see this, the layout + middleware are fine. Any dashboard crash is
+            then either in the data loaders or the CreateListingForm client component.
+          </p>
+          <div className="mt-4 flex gap-2">
+            <a href="/dashboard?debug=loaders" className="btn-secondary">
+              Try loaders only
+            </a>
+            <a href="/dashboard" className="btn-primary">
+              Try full page
+            </a>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   const sessionStep = await safeLoad('auth()', () => auth());
   if (!sessionStep.ok) {
     return (
@@ -64,6 +100,29 @@ export default async function DashboardPage() {
 
   const stats = statsStep.value;
   const connection = connectionStep.value;
+
+  // ?debug=loaders → render stats without the CreateListingForm client component
+  if (params.debug === 'loaders') {
+    return (
+      <div className="mx-auto max-w-5xl space-y-4">
+        <h1 className="text-2xl font-semibold text-gray-900">
+          Dashboard (loaders only, no form)
+        </h1>
+        <div className="card">
+          <p className="text-sm">
+            Build marker: <code className="font-mono text-xs">{BUILD_MARKER}</code>
+          </p>
+          <p className="text-sm">User: {name}</p>
+          <p className="text-sm">Active listings: {stats.liveListings}</p>
+          <p className="text-sm">Needs review: {stats.needsReview}</p>
+          <p className="text-sm">eBay connected: {connection.connected ? '✓' : '—'}</p>
+        </div>
+        <a href="/dashboard" className="btn-primary">
+          Try with form
+        </a>
+      </div>
+    );
+  }
 
   return (
     <div className="mx-auto max-w-5xl space-y-6">
