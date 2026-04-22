@@ -21,15 +21,17 @@ export default auth((req) => {
   if (isPublic) return NextResponse.next();
 
   if (!req.auth) {
-    const authUrl = process.env.AUTH_URL;
+    // Prefer X-Forwarded-Host (always reflects the real origin behind a
+    // reverse proxy like Railway). Fall back to AUTH_URL only when no proxy
+    // header is present and AUTH_URL is not a placeholder value.
     const forwardedHost = req.headers.get('x-forwarded-host');
     const forwardedProto = req.headers.get('x-forwarded-proto') ?? 'https';
-    const base =
-      authUrl && authUrl.length > 0
+    const authUrl = process.env.AUTH_URL;
+    const base = forwardedHost
+      ? `${forwardedProto}://${forwardedHost}`
+      : authUrl && authUrl.length > 0 && !authUrl.includes('placeholder')
         ? authUrl
-        : forwardedHost
-          ? `${forwardedProto}://${forwardedHost}`
-          : req.url;
+        : req.url;
     const loginUrl = new URL('/auth/login', base);
     loginUrl.searchParams.set('callbackUrl', pathname);
     return NextResponse.redirect(loginUrl);

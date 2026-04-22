@@ -28,6 +28,10 @@ const credentialsSchema = z.object({
  *   to the authenticated tenant.
  */
 export const { handlers, auth, signIn, signOut } = NextAuth({
+  // `trustHost` makes Auth.js use the incoming request's host/proto headers
+  // instead of a potentially stale AUTH_URL. Essential behind Railway where
+  // the outbound URL must match the request origin (not a placeholder env var).
+  trustHost: true,
   session: { strategy: 'jwt' },
   pages: {
     signIn: '/auth/login',
