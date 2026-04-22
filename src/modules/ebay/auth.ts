@@ -18,7 +18,10 @@ const refreshResponseSchema = z.object({
   token_type: z.string(),
 });
 
-const APP_ACCESS_SCOPE = 'https://api.ebay.com/oauth/scope';
+// Correct eBay public scope for client_credentials is `oauth/api_scope` (not
+// `oauth/scope`). This is the basic app-level scope that every developer
+// account gets and works for Browse API search endpoints.
+const APP_ACCESS_SCOPE = 'https://api.ebay.com/oauth/api_scope';
 
 export interface EbayOAuthConfig {
   readonly environment: EbayEnvironment;
