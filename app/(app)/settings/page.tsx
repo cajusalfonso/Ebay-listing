@@ -22,10 +22,21 @@ export default async function SettingsPage({ searchParams }: PageProps) {
   const userId = Number.parseInt(session?.user?.id ?? '0', 10);
   const ebayEnv: 'sandbox' | 'production' = 'sandbox';
 
-  const [existing, connection] = await Promise.all([
+  const [existingResult, connectionResult] = await Promise.allSettled([
     getCredentialsMaskedForUser(ebayEnv),
     isEbayConnected(userId, ebayEnv),
   ]);
+  const existing = existingResult.status === 'fulfilled' ? existingResult.value : null;
+  const connection =
+    connectionResult.status === 'fulfilled'
+      ? connectionResult.value
+      : { connected: false, accessExpiresAt: null, refreshExpiresAt: null };
+  const loadError =
+    existingResult.status === 'rejected'
+      ? `Credentials: ${(existingResult.reason as Error)?.message ?? String(existingResult.reason)}`
+      : connectionResult.status === 'rejected'
+        ? `Connection: ${(connectionResult.reason as Error)?.message ?? String(connectionResult.reason)}`
+        : null;
 
   const params = await searchParams;
   const connectedEnv = params.connected;
@@ -52,6 +63,12 @@ export default async function SettingsPage({ searchParams }: PageProps) {
       {errorMessage ? (
         <div className="rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-700">
           {errorMessage}
+        </div>
+      ) : null}
+      {loadError ? (
+        <div className="rounded-md border border-orange-200 bg-orange-50 p-3 text-xs text-orange-900">
+          <div className="mb-1 font-semibold">⚠ Teilweise Load-Fehler:</div>
+          <pre className="whitespace-pre-wrap break-all font-mono">{loadError}</pre>
         </div>
       ) : null}
 
