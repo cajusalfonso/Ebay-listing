@@ -9,6 +9,7 @@ import { createUserTokenStore } from '../../../src/modules/ebay/userTokenStore';
 import { auth } from '../../../lib/auth';
 import { db } from '../../../lib/db';
 import { getEncryptionKey } from '../../../lib/encryption-key';
+import { buildUserOauthClient, MissingCredentialsError } from '../../../lib/user-clients';
 
 const credentialsSchema = z.object({
   ebayEnv: z.enum(['sandbox', 'production']),
@@ -302,6 +303,87 @@ export async function importManualEbayTokensAction(
     ok: true,
     message: `Tokens gespeichert (${parsed.data.ebayEnv}). Access gültig ${Math.floor(accessExpiresInSec / 60)} min. ${suffix}`,
   };
+}
+
+/**
+ * Redeem an OAuth authorization code for a full token pair.
+ *
+ * Use case: eBay's Sandbox RuName portal is flaky and can fall back to the
+ * generic "Thank You" page after a user consents, even though eBay did issue
+ * a valid authorization code (visible as `?code=...` in the Thank-You URL).
+ * This action lets the user manually paste that code; we exchange it for a
+ * real access + refresh token pair (access ~2h, refresh ~18 months) and
+ * persist them to `user_ebay_tokens`. The rest of the pipeline then works
+ * exactly as if the callback had been invoked.
+ */
+const authCodeSchema = z.object({
+  ebayEnv: z.enum(['sandbox', 'production']),
+  code: z.string().trim().min(20, 'Auth-Code zu kurz.'),
+});
+
+export async function redeemAuthCodeAction(
+  formData: FormData
+): Promise<CredentialsSaveResult> {
+  const session = await auth();
+  if (!session?.user?.id) return { ok: false, error: 'Nicht eingeloggt.' };
+  const userId = Number.parseInt(session.user.id, 10);
+
+  const parsed = authCodeSchema.safeParse({
+    ebayEnv: formData.get('ebayEnv'),
+    code: formData.get('code'),
+  });
+  if (!parsed.success) {
+    return { ok: false, error: parsed.error.issues[0]?.message ?? 'Ungültige Eingabe' };
+  }
+
+  // Users often paste the full Thank-You URL instead of just the code — pull
+  // out the `code=...` query param if so. eBay codes are URL-encoded.
+  let rawCode = parsed.data.code;
+  if (rawCode.includes('code=')) {
+    try {
+      const asUrl = new URL(rawCode);
+      const fromQuery = asUrl.searchParams.get('code');
+      if (fromQuery) rawCode = fromQuery;
+    } catch {
+      const match = rawCode.match(/code=([^&\s]+)/);
+      if (match?.[1]) rawCode = decodeURIComponent(match[1]);
+    }
+  }
+
+  let oauth;
+  try {
+    oauth = await buildUserOauthClient(userId, parsed.data.ebayEnv);
+  } catch (error) {
+    if (error instanceof MissingCredentialsError) {
+      return {
+        ok: false,
+        error: `Fehlend: ${error.missing.join(', ')}. Erst App ID/Cert ID/RuName speichern.`,
+      };
+    }
+    throw error;
+  }
+
+  try {
+    const tokens = await oauth.exchangeCodeForTokens(rawCode);
+    const key = getEncryptionKey();
+    const store = createUserTokenStore(db, userId, key);
+    await store.save(parsed.data.ebayEnv, tokens);
+
+    revalidatePath('/settings');
+    const refreshDays = Math.round(
+      (tokens.refreshTokenExpiresAt.getTime() - Date.now()) / 86_400_000
+    );
+    return {
+      ok: true,
+      message: `Verbunden! Refresh Token gültig ${refreshDays} Tage — App erneuert Access Token automatisch.`,
+    };
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    return {
+      ok: false,
+      error: `Token-Exchange fehlgeschlagen: ${message}. Code evtl. abgelaufen (5 min) oder falsch kopiert.`,
+    };
+  }
 }
 
 export async function revealCredentialAction(

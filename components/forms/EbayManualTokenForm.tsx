@@ -1,9 +1,9 @@
 'use client';
 
 import { useActionState } from 'react';
-import { Upload } from 'lucide-react';
+import { KeyRound } from 'lucide-react';
 import {
-  importManualEbayTokensAction,
+  redeemAuthCodeAction,
   type CredentialsSaveResult,
 } from '../../app/(app)/settings/actions';
 
@@ -14,136 +14,81 @@ interface Props {
 }
 
 /**
- * Escape hatch for the "eBay OAuth portal won't save my RuName URLs" bug.
- * The user goes to developer.ebay.com -> "Get a User Token Here" -> OAuth
- * radio -> Sign in to Sandbox for OAuth, copies the generated access +
- * refresh tokens, pastes them here. We store them encrypted in the same
- * table our OAuth callback would have written to, so the rest of the
- * pipeline is identical.
+ * Escape hatch for when eBay's RuName OAuth config refuses to redirect
+ * properly after consent. eBay still issues a valid authorization code in
+ * the fallback Thank-You URL; the user pastes that URL (or the raw code)
+ * here and we exchange it for a proper access + 18-month refresh token
+ * pair via our existing `exchangeCodeForTokens` flow.
  */
 export function EbayManualTokenForm({ ebayEnv }: Props) {
   const [state, formAction, isPending] = useActionState(
     async (_prev: CredentialsSaveResult, formData: FormData) =>
-      importManualEbayTokensAction(formData),
+      redeemAuthCodeAction(formData),
     initialState
   );
 
   return (
     <details className="card">
       <summary className="flex cursor-pointer items-center gap-2 text-sm font-medium text-gray-700">
-        <Upload size={16} />
-        Tokens manuell importieren (Fallback, wenn OAuth-Flow nicht funktioniert)
+        <KeyRound size={16} />
+        Auth-Code manuell einlösen (wenn Connect-Flow im Thank-You-Page endet)
       </summary>
 
       <div className="mt-4 space-y-4 border-t border-gray-100 pt-4">
         <div className="rounded-md bg-blue-50 p-3 text-xs text-blue-900">
-          <p className="font-semibold">So generierst du den Access Token:</p>
+          <p className="font-semibold">Ergebnis: 18 Monate gültige Verbindung.</p>
+          <p className="mt-1">
+            eBays Sandbox-Portal leitet nach dem Consent manchmal auf eine generische
+            Thank-You-Page weiter, statt zurück zur App. Der Auth-Code steht aber
+            trotzdem in der URL. Wir lösen ihn hier manuell ein und bekommen dadurch
+            den richtigen <strong>18-Monats-Refresh-Token</strong> — danach läuft die
+            App autonom, Access Token wird automatisch erneuert.
+          </p>
+          <p className="mt-2 font-semibold">Anleitung:</p>
           <ol className="mt-1 list-decimal space-y-1 pl-5">
             <li>
-              Öffne{' '}
-              <a
-                href="https://developer.ebay.com/my/auth?env=sandbox&index=0"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-blue-700 underline"
-              >
-                developer.ebay.com – User Tokens
-              </a>{' '}
-              und wähle die App <strong>Medici Bot</strong>
+              Oben auf <strong>„Connect eBay"</strong> klicken
+            </li>
+            <li>Bei eBay Sandbox einloggen, Consent bestätigen</li>
+            <li>
+              Wenn du auf der <strong>„Thank You"-Page</strong> landest: URL aus der
+              Adresszeile kopieren (Cmd+L, Cmd+C, Cmd+V). Sie sieht so aus:
+              <br />
+              <code className="mt-1 inline-block rounded bg-white px-1 py-0.5 text-[10px]">
+                https://auth2.sandbox.ebay.com/...?isAuthSuccessful=true&amp;state=...&amp;code=v^1.1#...&amp;expires_in=299
+              </code>
             </li>
             <li>
-              Scroll zu <strong>„Get a User Token Here"</strong>, wähle{' '}
-              <strong>OAuth (new security)</strong>
-            </li>
-            <li>
-              Klick <strong>„Sign in to Sandbox for OAuth"</strong> → Sandbox-Login
-            </li>
-            <li>
-              Nach dem Login wird der <strong>User Token</strong> angezeigt. Per
-              <strong> „Copy Token to Clipboard"</strong> kopieren und in das Access-Feld
-              unten einfügen.
+              Die komplette URL <strong>oder nur den Code-Teil</strong> hier einfügen
+              und innerhalb von <strong>5 Minuten</strong> einlösen (der Code läuft
+              schnell ab)
             </li>
           </ol>
-          <p className="mt-2">
-            <strong>Refresh Token</strong> ist optional — eBays Portal zeigt ihn nicht an.
-            Ohne Refresh Token läuft der Access Token nach 2 h ab, dann einfach neu
-            importieren.
-          </p>
         </div>
 
         <form action={formAction} className="space-y-3">
           <input type="hidden" name="ebayEnv" value={ebayEnv} />
 
           <div>
-            <label
-              htmlFor="accessToken"
-              className="block text-sm font-medium text-gray-700"
-            >
-              Access Token (User Token)
+            <label htmlFor="code" className="block text-sm font-medium text-gray-700">
+              Auth-Code oder komplette Thank-You-URL
             </label>
             <textarea
-              id="accessToken"
-              name="accessToken"
+              id="code"
+              name="code"
               required
               rows={4}
               className="input mt-1 w-full font-mono text-xs"
-              placeholder="v^1.1#i^1#I^3#f^0#p^3#..."
+              placeholder="v^1.1#i^1#... — oder die komplette URL aus der Adresszeile"
             />
-          </div>
-
-          <div>
-            <label
-              htmlFor="refreshToken"
-              className="block text-sm font-medium text-gray-700"
-            >
-              Refresh Token <span className="text-gray-400">(optional)</span>
-            </label>
-            <textarea
-              id="refreshToken"
-              name="refreshToken"
-              rows={4}
-              className="input mt-1 w-full font-mono text-xs"
-              placeholder="Leer lassen, wenn nicht vorhanden"
-            />
-          </div>
-
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label
-                htmlFor="accessTokenExpiresInSeconds"
-                className="block text-xs font-medium text-gray-600"
-              >
-                Access-Gültigkeit (Sekunden, default 7200 = 2h)
-              </label>
-              <input
-                type="number"
-                id="accessTokenExpiresInSeconds"
-                name="accessTokenExpiresInSeconds"
-                min="60"
-                className="input mt-1 w-full"
-                placeholder="7200"
-              />
-            </div>
-            <div>
-              <label
-                htmlFor="refreshTokenExpiresInSeconds"
-                className="block text-xs font-medium text-gray-600"
-              >
-                Refresh-Gültigkeit (Sekunden, default 47260800 = 18 Monate)
-              </label>
-              <input
-                type="number"
-                id="refreshTokenExpiresInSeconds"
-                name="refreshTokenExpiresInSeconds"
-                min="60"
-                className="input mt-1 w-full"
-                placeholder="47260800"
-              />
-            </div>
+            <p className="mt-1 text-xs text-gray-500">
+              Wir extrahieren automatisch den Code aus einer URL, falls du die ganze
+              Zeile paste'st.
+            </p>
           </div>
 
           <button type="submit" disabled={isPending} className="btn-primary">
-            {isPending ? 'Speichere …' : 'Tokens importieren'}
+            {isPending ? 'Löse ein …' : 'Code einlösen'}
           </button>
 
           {state.message ? (
