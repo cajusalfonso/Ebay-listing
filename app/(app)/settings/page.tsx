@@ -4,6 +4,8 @@ import { EbayConnectCard } from '../../../components/forms/EbayConnectCard';
 import { EbayManualTokenForm } from '../../../components/forms/EbayManualTokenForm';
 import { isEbayConnected } from '../../../lib/user-clients';
 import { getCredentialsMaskedForUser } from './actions';
+import { safeLoad } from '../../../lib/safe-load';
+import { LoadErrorPanel } from '../../../components/ui/LoadErrorPanel';
 
 const ERROR_MESSAGES: Record<string, string> = {
   missing_credentials: 'Bitte zuerst App-ID, Cert-ID, Dev-ID und RuName speichern.',
@@ -17,102 +19,54 @@ interface PageProps {
   searchParams: Promise<{ connected?: string; error?: string }>;
 }
 
-type LoadResult =
-  | {
-      ok: true;
-      userId: number;
-      existing: Awaited<ReturnType<typeof getCredentialsMaskedForUser>>;
-      connection: { connected: boolean; accessExpiresAt: Date | null; refreshExpiresAt: Date | null };
-    }
-  | { ok: false; where: string; message: string; stack?: string | undefined };
-
-async function loadPageData(): Promise<LoadResult> {
-  let userId: number;
-  try {
-    const session = await auth();
-    userId = Number.parseInt(session?.user?.id ?? '0', 10);
-  } catch (error) {
-    const e = error as Error;
-    return { ok: false, where: 'auth()', message: e.message || String(e), stack: e.stack };
-  }
-
-  const ebayEnv: 'sandbox' | 'production' = 'sandbox';
-
-  let existing: Awaited<ReturnType<typeof getCredentialsMaskedForUser>> = null;
-  try {
-    existing = await getCredentialsMaskedForUser(ebayEnv);
-  } catch (error) {
-    const e = error as Error;
-    return {
-      ok: false,
-      where: 'getCredentialsMaskedForUser',
-      message: e.message || String(e),
-      stack: e.stack,
-    };
-  }
-
-  let connection: {
-    connected: boolean;
-    accessExpiresAt: Date | null;
-    refreshExpiresAt: Date | null;
-  };
-  try {
-    connection = await isEbayConnected(userId, ebayEnv);
-  } catch (error) {
-    const e = error as Error;
-    return {
-      ok: false,
-      where: 'isEbayConnected',
-      message: e.message || String(e),
-      stack: e.stack,
-    };
-  }
-
-  return { ok: true, userId, existing, connection };
-}
-
 export default async function SettingsPage({ searchParams }: PageProps) {
-  const loaded = await loadPageData();
-  const params = await searchParams;
   const ebayEnv: 'sandbox' | 'production' = 'sandbox';
 
-  if (!loaded.ok) {
+  const sessionStep = await safeLoad('auth()', () => auth());
+  if (!sessionStep.ok) {
     return (
-      <div className="mx-auto max-w-3xl space-y-4">
-        <h1 className="text-2xl font-semibold text-red-700">Settings: Load-Fehler</h1>
-        <div className="rounded-md border border-red-200 bg-red-50 p-4 text-sm">
-          <div className="mb-2">
-            <span className="font-semibold">Stelle:</span>{' '}
-            <code className="font-mono text-xs">{loaded.where}</code>
-          </div>
-          <div className="mb-2">
-            <span className="font-semibold">Message:</span>
-            <pre className="mt-1 whitespace-pre-wrap break-all font-mono text-xs text-red-900">
-              {loaded.message}
-            </pre>
-          </div>
-          {loaded.stack ? (
-            <div>
-              <span className="font-semibold">Stack:</span>
-              <pre className="mt-1 max-h-96 overflow-auto whitespace-pre-wrap break-all rounded bg-white p-2 font-mono text-[10px] text-gray-800">
-                {loaded.stack}
-              </pre>
-            </div>
-          ) : null}
-        </div>
-        <div className="flex gap-2">
-          <a href="/settings" className="btn-primary">
-            Erneut laden
-          </a>
-          <a href="/auth/login" className="btn-secondary">
-            Neu einloggen
-          </a>
-        </div>
-      </div>
+      <LoadErrorPanel
+        title="Settings: Session-Fehler"
+        where={sessionStep.where}
+        message={sessionStep.message}
+        stack={sessionStep.stack}
+      />
+    );
+  }
+  const userId = Number.parseInt(sessionStep.value?.user?.id ?? '0', 10);
+
+  const existingStep = await safeLoad('getCredentialsMaskedForUser', () =>
+    getCredentialsMaskedForUser(ebayEnv)
+  );
+  if (!existingStep.ok) {
+    return (
+      <LoadErrorPanel
+        title="Settings: Credentials-Load-Fehler"
+        where={existingStep.where}
+        message={existingStep.message}
+        stack={existingStep.stack}
+      />
     );
   }
 
-  const { existing, connection } = loaded;
+  const connectionStep = await safeLoad('isEbayConnected', () =>
+    isEbayConnected(userId, ebayEnv)
+  );
+  if (!connectionStep.ok) {
+    return (
+      <LoadErrorPanel
+        title="Settings: Connection-Status-Fehler"
+        where={connectionStep.where}
+        message={connectionStep.message}
+        stack={connectionStep.stack}
+      />
+    );
+  }
+
+  const existing = existingStep.value;
+  const connection = connectionStep.value;
+
+  const params = await searchParams;
   const connectedEnv = params.connected;
   const errorCode = params.error;
   const errorMessage = errorCode

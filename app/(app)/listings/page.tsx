@@ -4,6 +4,8 @@ import { ExternalLink, AlertTriangle } from 'lucide-react';
 import { auth } from '../../../lib/auth';
 import { db } from '../../../lib/db';
 import { listings, needsReview } from '../../../src/db/schema';
+import { safeLoad } from '../../../lib/safe-load';
+import { LoadErrorPanel } from '../../../components/ui/LoadErrorPanel';
 
 const STATUS_COLORS: Record<string, string> = {
   published: 'bg-brand-50 text-brand-700 border-brand-200',
@@ -44,23 +46,49 @@ function listingUrl(env: string, id: string | null): string | null {
 }
 
 export default async function ListingsPage() {
-  const session = await auth();
-  const userId = Number.parseInt(session?.user?.id ?? '0', 10);
+  const sessionStep = await safeLoad('auth()', () => auth());
+  if (!sessionStep.ok) {
+    return (
+      <LoadErrorPanel
+        title="Listings: Session-Fehler"
+        where={sessionStep.where}
+        message={sessionStep.message}
+        stack={sessionStep.stack}
+      />
+    );
+  }
 
-  const [activeListings, review] = await Promise.all([
-    db
-      .select()
-      .from(listings)
-      .where(eq(listings.userId, userId))
-      .orderBy(desc(listings.createdAt))
-      .limit(50),
-    db
-      .select()
-      .from(needsReview)
-      .where(eq(needsReview.userId, userId))
-      .orderBy(desc(needsReview.createdAt))
-      .limit(10),
-  ]);
+  const userId = Number.parseInt(sessionStep.value?.user?.id ?? '0', 10);
+
+  const dataStep = await safeLoad('listings + needsReview query', async () => {
+    const [activeListings, review] = await Promise.all([
+      db
+        .select()
+        .from(listings)
+        .where(eq(listings.userId, userId))
+        .orderBy(desc(listings.createdAt))
+        .limit(50),
+      db
+        .select()
+        .from(needsReview)
+        .where(eq(needsReview.userId, userId))
+        .orderBy(desc(needsReview.createdAt))
+        .limit(10),
+    ]);
+    return { activeListings, review };
+  });
+  if (!dataStep.ok) {
+    return (
+      <LoadErrorPanel
+        title="Listings: Query-Fehler"
+        where={dataStep.where}
+        message={dataStep.message}
+        stack={dataStep.stack}
+      />
+    );
+  }
+
+  const { activeListings, review } = dataStep.value;
 
   return (
     <div className="mx-auto max-w-6xl space-y-6">

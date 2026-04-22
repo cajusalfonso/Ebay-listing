@@ -2,13 +2,12 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { LayoutDashboard, Package, Settings, List, LogOut } from 'lucide-react';
+import { LayoutDashboard, Settings, List, LogOut } from 'lucide-react';
 import { signOutAction } from '../../app/(app)/actions';
 
 const navItems = [
   { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { href: '/listings', label: 'Listings', icon: List },
-  { href: '/products', label: 'Products', icon: Package },
   { href: '/settings', label: 'Settings', icon: Settings },
 ];
 

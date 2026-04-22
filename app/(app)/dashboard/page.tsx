@@ -4,31 +4,66 @@ import { db } from '../../../lib/db';
 import { isEbayConnected } from '../../../lib/user-clients';
 import { listings, needsReview } from '../../../src/db/schema';
 import { CreateListingForm } from '../../../components/forms/CreateListingForm';
-
-async function loadUserStats(userId: number) {
-  const [liveRow] = await db
-    .select({ total: count() })
-    .from(listings)
-    .where(and(eq(listings.userId, userId), eq(listings.status, 'published')));
-  const [reviewRow] = await db
-    .select({ total: count() })
-    .from(needsReview)
-    .where(eq(needsReview.userId, userId));
-  return {
-    liveListings: liveRow?.total ?? 0,
-    needsReview: reviewRow?.total ?? 0,
-  };
-}
+import { safeLoad } from '../../../lib/safe-load';
+import { LoadErrorPanel } from '../../../components/ui/LoadErrorPanel';
 
 export default async function DashboardPage() {
-  const session = await auth();
-  const userId = Number.parseInt(session?.user?.id ?? '0', 10);
-  const name = session?.user?.name ?? session?.user?.email ?? 'there';
+  const sessionStep = await safeLoad('auth()', () => auth());
+  if (!sessionStep.ok) {
+    return (
+      <LoadErrorPanel
+        title="Dashboard: Session-Fehler"
+        where={sessionStep.where}
+        message={sessionStep.message}
+        stack={sessionStep.stack}
+      />
+    );
+  }
 
-  const [stats, connection] = await Promise.all([
-    loadUserStats(userId),
-    isEbayConnected(userId, 'sandbox'),
-  ]);
+  const userId = Number.parseInt(sessionStep.value?.user?.id ?? '0', 10);
+  const name = sessionStep.value?.user?.name ?? sessionStep.value?.user?.email ?? 'there';
+
+  const statsStep = await safeLoad('loadUserStats', async () => {
+    const [liveRow] = await db
+      .select({ total: count() })
+      .from(listings)
+      .where(and(eq(listings.userId, userId), eq(listings.status, 'published')));
+    const [reviewRow] = await db
+      .select({ total: count() })
+      .from(needsReview)
+      .where(eq(needsReview.userId, userId));
+    return {
+      liveListings: liveRow?.total ?? 0,
+      needsReview: reviewRow?.total ?? 0,
+    };
+  });
+  if (!statsStep.ok) {
+    return (
+      <LoadErrorPanel
+        title="Dashboard: Stats-Fehler"
+        where={statsStep.where}
+        message={statsStep.message}
+        stack={statsStep.stack}
+      />
+    );
+  }
+
+  const connectionStep = await safeLoad('isEbayConnected', () =>
+    isEbayConnected(userId, 'sandbox')
+  );
+  if (!connectionStep.ok) {
+    return (
+      <LoadErrorPanel
+        title="Dashboard: eBay-Status-Fehler"
+        where={connectionStep.where}
+        message={connectionStep.message}
+        stack={connectionStep.stack}
+      />
+    );
+  }
+
+  const stats = statsStep.value;
+  const connection = connectionStep.value;
 
   return (
     <div className="mx-auto max-w-5xl space-y-6">
