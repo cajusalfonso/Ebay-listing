@@ -66,38 +66,108 @@ export async function saveCredentialsAction(
   const key = getEncryptionKey();
   const data = parsed.data;
 
-  const toInsert = {
-    userId,
-    ebayEnv: data.ebayEnv,
-    ebayAppIdEncrypted: enc(key, data.ebayAppId),
-    ebayCertIdEncrypted: enc(key, data.ebayCertId),
-    ebayDevIdEncrypted: enc(key, data.ebayDevId),
-    ebayRedirectUriName: data.ebayRedirectUriName ?? null,
-    icecatUserEncrypted: enc(key, data.icecatUser),
-    icecatPasswordEncrypted: enc(key, data.icecatPassword),
-    discordWebhookUrlEncrypted: enc(key, data.discordWebhookUrl),
-    merchantLocationKey: data.merchantLocationKey ?? null,
-  };
+  // Check if row already exists — determines INSERT vs partial UPDATE.
+  const existing = await db
+    .select()
+    .from(userCredentials)
+    .where(and(eq(userCredentials.userId, userId), eq(userCredentials.ebayEnv, data.ebayEnv)))
+    .limit(1);
 
-  await db
-    .insert(userCredentials)
-    .values(toInsert)
-    .onConflictDoUpdate({
-      target: [userCredentials.userId, userCredentials.ebayEnv],
-      set: {
-        ebayAppIdEncrypted: toInsert.ebayAppIdEncrypted,
-        ebayCertIdEncrypted: toInsert.ebayCertIdEncrypted,
-        ebayDevIdEncrypted: toInsert.ebayDevIdEncrypted,
-        ebayRedirectUriName: toInsert.ebayRedirectUriName,
-        icecatUserEncrypted: toInsert.icecatUserEncrypted,
-        icecatPasswordEncrypted: toInsert.icecatPasswordEncrypted,
-        discordWebhookUrlEncrypted: toInsert.discordWebhookUrlEncrypted,
-        merchantLocationKey: toInsert.merchantLocationKey,
-      },
-    });
+  const updatedLabels: string[] = [];
+  const isNew = existing.length === 0;
+
+  if (isNew) {
+    const toInsert = {
+      userId,
+      ebayEnv: data.ebayEnv,
+      ebayAppIdEncrypted: enc(key, data.ebayAppId),
+      ebayCertIdEncrypted: enc(key, data.ebayCertId),
+      ebayDevIdEncrypted: enc(key, data.ebayDevId),
+      ebayRedirectUriName: data.ebayRedirectUriName || null,
+      icecatUserEncrypted: enc(key, data.icecatUser),
+      icecatPasswordEncrypted: enc(key, data.icecatPassword),
+      discordWebhookUrlEncrypted: enc(key, data.discordWebhookUrl),
+      merchantLocationKey: data.merchantLocationKey || null,
+    };
+    await db.insert(userCredentials).values(toInsert);
+
+    if (toInsert.ebayAppIdEncrypted) updatedLabels.push('App ID');
+    if (toInsert.ebayCertIdEncrypted) updatedLabels.push('Cert ID');
+    if (toInsert.ebayDevIdEncrypted) updatedLabels.push('Dev ID');
+    if (toInsert.ebayRedirectUriName) updatedLabels.push('RuName');
+    if (toInsert.merchantLocationKey) updatedLabels.push('Location Key');
+    if (toInsert.icecatUserEncrypted) updatedLabels.push('Icecat User');
+    if (toInsert.icecatPasswordEncrypted) updatedLabels.push('Icecat Password');
+    if (toInsert.discordWebhookUrlEncrypted) updatedLabels.push('Discord Webhook');
+  } else {
+    // UPDATE: only set fields where the user provided a new value.
+    // Empty input means "keep existing" (matches the "Leerlassen zum Beibehalten" placeholder).
+    const updateSet: Record<string, unknown> = {};
+
+    const newAppId = enc(key, data.ebayAppId);
+    if (newAppId) {
+      updateSet.ebayAppIdEncrypted = newAppId;
+      updatedLabels.push('App ID');
+    }
+    const newCertId = enc(key, data.ebayCertId);
+    if (newCertId) {
+      updateSet.ebayCertIdEncrypted = newCertId;
+      updatedLabels.push('Cert ID');
+    }
+    const newDevId = enc(key, data.ebayDevId);
+    if (newDevId) {
+      updateSet.ebayDevIdEncrypted = newDevId;
+      updatedLabels.push('Dev ID');
+    }
+    const newIcecatUser = enc(key, data.icecatUser);
+    if (newIcecatUser) {
+      updateSet.icecatUserEncrypted = newIcecatUser;
+      updatedLabels.push('Icecat User');
+    }
+    const newIcecatPassword = enc(key, data.icecatPassword);
+    if (newIcecatPassword) {
+      updateSet.icecatPasswordEncrypted = newIcecatPassword;
+      updatedLabels.push('Icecat Password');
+    }
+    const newDiscord = enc(key, data.discordWebhookUrl);
+    if (newDiscord) {
+      updateSet.discordWebhookUrlEncrypted = newDiscord;
+      updatedLabels.push('Discord Webhook');
+    }
+    // Plain-text fields: always update (the form pre-populates them with existing
+    // value via defaultValue, so an empty submit means the user explicitly cleared).
+    if (data.ebayRedirectUriName !== undefined) {
+      const v = data.ebayRedirectUriName || null;
+      if (v !== existing[0]!.ebayRedirectUriName) {
+        updateSet.ebayRedirectUriName = v;
+        updatedLabels.push('RuName');
+      }
+    }
+    if (data.merchantLocationKey !== undefined) {
+      const v = data.merchantLocationKey || null;
+      if (v !== existing[0]!.merchantLocationKey) {
+        updateSet.merchantLocationKey = v;
+        updatedLabels.push('Location Key');
+      }
+    }
+
+    if (Object.keys(updateSet).length > 0) {
+      await db
+        .update(userCredentials)
+        .set(updateSet)
+        .where(and(eq(userCredentials.userId, userId), eq(userCredentials.ebayEnv, data.ebayEnv)));
+    }
+  }
 
   revalidatePath('/settings');
-  return { ok: true, message: 'Credentials gespeichert (AES-256-GCM verschlüsselt).' };
+
+  if (updatedLabels.length === 0) {
+    return { ok: true, message: 'Keine Änderungen — alle Felder leer gelassen.' };
+  }
+  return {
+    ok: true,
+    message: `Gespeichert: ${updatedLabels.join(', ')} (AES-256-GCM verschlüsselt).`,
+  };
 }
 
 export async function getCredentialsMaskedForUser(
