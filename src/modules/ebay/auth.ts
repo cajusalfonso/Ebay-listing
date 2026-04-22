@@ -71,7 +71,15 @@ export function createEbayOAuthClient(config: EbayOAuthConfig): EbayOAuthClient 
     });
     const json: unknown = await body.json();
     if (statusCode !== 200) {
-      throw new EbayAuthError(`eBay token endpoint returned ${statusCode}`, {
+      // Include eBay's error body in the message — otherwise failures look
+      // identical (just "returned 400") and debugging requires logs access.
+      const detail =
+        json && typeof json === 'object' && 'error_description' in json
+          ? String((json as { error_description: unknown }).error_description)
+          : json && typeof json === 'object' && 'error' in json
+            ? String((json as { error: unknown }).error)
+            : JSON.stringify(json).slice(0, 200);
+      throw new EbayAuthError(`eBay token endpoint returned ${statusCode}: ${detail}`, {
         statusCode,
         response: json,
       });
