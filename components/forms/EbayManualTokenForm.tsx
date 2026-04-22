@@ -37,7 +37,7 @@ export function EbayManualTokenForm({ ebayEnv }: Props) {
 
       <div className="mt-4 space-y-4 border-t border-gray-100 pt-4">
         <div className="rounded-md bg-blue-50 p-3 text-xs text-blue-900">
-          <p className="font-semibold">So generierst du die Tokens:</p>
+          <p className="font-semibold">So generierst du den Access Token:</p>
           <ol className="mt-1 list-decimal space-y-1 pl-5">
             <li>
               Öffne{' '}
@@ -59,10 +59,16 @@ export function EbayManualTokenForm({ ebayEnv }: Props) {
               Klick <strong>„Sign in to Sandbox for OAuth"</strong> → Sandbox-Login
             </li>
             <li>
-              Nach dem Login erscheinen <strong>User Token</strong> (Access) und darunter
-              <strong> Refresh Token</strong>. Beide kopieren und hier einfügen.
+              Nach dem Login wird der <strong>User Token</strong> angezeigt. Per
+              <strong> „Copy Token to Clipboard"</strong> kopieren und in das Access-Feld
+              unten einfügen.
             </li>
           </ol>
+          <p className="mt-2">
+            <strong>Refresh Token</strong> ist optional — eBays Portal zeigt ihn nicht an.
+            Ohne Refresh Token läuft der Access Token nach 2 h ab, dann einfach neu
+            importieren.
+          </p>
         </div>
 
         <form action={formAction} className="space-y-3">
@@ -90,15 +96,14 @@ export function EbayManualTokenForm({ ebayEnv }: Props) {
               htmlFor="refreshToken"
               className="block text-sm font-medium text-gray-700"
             >
-              Refresh Token
+              Refresh Token <span className="text-gray-400">(optional)</span>
             </label>
             <textarea
               id="refreshToken"
               name="refreshToken"
-              required
               rows={4}
               className="input mt-1 w-full font-mono text-xs"
-              placeholder="v^1.1#i^1#r^1#..."
+              placeholder="Leer lassen, wenn nicht vorhanden"
             />
           </div>
 

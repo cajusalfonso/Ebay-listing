@@ -246,7 +246,7 @@ const FIELD_TO_COLUMN: Record<RevealableField, keyof typeof userCredentials.$inf
 const manualTokensSchema = z.object({
   ebayEnv: z.enum(['sandbox', 'production']),
   accessToken: z.string().trim().min(20, 'Access Token zu kurz.'),
-  refreshToken: z.string().trim().min(20, 'Refresh Token zu kurz.'),
+  refreshToken: z.string().trim().optional(),
   accessTokenExpiresInSeconds: z.coerce.number().int().positive().optional(),
   refreshTokenExpiresInSeconds: z.coerce.number().int().positive().optional(),
 });
@@ -261,7 +261,7 @@ export async function importManualEbayTokensAction(
   const parsed = manualTokensSchema.safeParse({
     ebayEnv: formData.get('ebayEnv'),
     accessToken: formData.get('accessToken'),
-    refreshToken: formData.get('refreshToken'),
+    refreshToken: formData.get('refreshToken') || undefined,
     accessTokenExpiresInSeconds: formData.get('accessTokenExpiresInSeconds') || undefined,
     refreshTokenExpiresInSeconds: formData.get('refreshTokenExpiresInSeconds') || undefined,
   });
@@ -273,19 +273,34 @@ export async function importManualEbayTokensAction(
   const refreshExpiresInSec = parsed.data.refreshTokenExpiresInSeconds ?? 60 * 60 * 24 * 547; // 18mo default
   const now = Date.now();
 
+  // If no refresh token provided, store the access token in its slot too so
+  // the column isn't null (we can't issue refreshes without a real refresh
+  // token — the user will need to re-import when the access token expires).
+  const refreshToken = parsed.data.refreshToken?.trim() || parsed.data.accessToken.trim();
+  const hasRealRefreshToken = Boolean(
+    parsed.data.refreshToken && parsed.data.refreshToken.trim().length >= 20
+  );
+
   const key = getEncryptionKey();
   const store = createUserTokenStore(db, userId, key);
   await store.save(parsed.data.ebayEnv, {
     accessToken: parsed.data.accessToken,
-    refreshToken: parsed.data.refreshToken,
+    refreshToken,
     accessTokenExpiresAt: new Date(now + accessExpiresInSec * 1000),
-    refreshTokenExpiresAt: new Date(now + refreshExpiresInSec * 1000),
+    // If no real refresh token, mark refresh as expired immediately so we
+    // don't pretend we can renew.
+    refreshTokenExpiresAt: new Date(
+      now + (hasRealRefreshToken ? refreshExpiresInSec : accessExpiresInSec) * 1000
+    ),
   });
 
   revalidatePath('/settings');
+  const suffix = hasRealRefreshToken
+    ? `Refresh ${Math.floor(refreshExpiresInSec / 86400)} Tage.`
+    : 'Kein Refresh Token — bei Ablauf erneut importieren.';
   return {
     ok: true,
-    message: `Tokens gespeichert (${parsed.data.ebayEnv}). Access gültig ${Math.floor(accessExpiresInSec / 60)} min, Refresh ${Math.floor(refreshExpiresInSec / 86400)} Tage.`,
+    message: `Tokens gespeichert (${parsed.data.ebayEnv}). Access gültig ${Math.floor(accessExpiresInSec / 60)} min. ${suffix}`,
   };
 }
 
