@@ -19,13 +19,14 @@ export type EbayEnvironment = keyof typeof EBAY_BASE_URLS;
 /** eBay.de marketplace ID required on every Browse/Inventory call. */
 export const EBAY_MARKETPLACE_ID = 'EBAY_DE';
 
-/** OAuth scopes needed for MVP flows. */
+/** OAuth scopes needed for MVP flows. Restricted scopes (commerce.catalog,
+ *  buy.item.feed) are intentionally omitted — they require per-account
+ *  partner onboarding with eBay and cause temporarily_unavailable 500 on
+ *  /oauth2/authorize when the app is not whitelisted. */
 export const EBAY_OAUTH_SCOPES: readonly string[] = [
   'https://api.ebay.com/oauth/api_scope/sell.inventory',
   'https://api.ebay.com/oauth/api_scope/sell.account.readonly',
   'https://api.ebay.com/oauth/api_scope/sell.fulfillment.readonly',
-  'https://api.ebay.com/oauth/api_scope/commerce.catalog.readonly',
-  'https://api.ebay.com/oauth/api_scope/buy.item.feed',
 ] as const;
 
 /** HTTP timeouts in milliseconds. */
