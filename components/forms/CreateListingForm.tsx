@@ -97,8 +97,8 @@ function formatPercent(value: number): string {
 }
 
 // Idealo doesn't expose an API but their public search accepts an EAN via
-// ?q=. Each domain has its own index (DE/FR/AT/UK) so the user can spot-check
-// real market prices per country without leaving the page.
+// Google Shopping with a site filter. This is bullet-proof across all four
+// country domains (the idealo internal search path differs per locale).
 const IDEALO_DOMAINS: readonly { flag: string; label: string; domain: string }[] = [
   { flag: '🇩🇪', label: 'idealo.de', domain: 'idealo.de' },
   { flag: '🇫🇷', label: 'idealo.fr', domain: 'idealo.fr' },
@@ -107,7 +107,11 @@ const IDEALO_DOMAINS: readonly { flag: string; label: string; domain: string }[]
 ];
 
 function idealoSearchUrl(domain: string, ean: string): string {
-  return `https://www.${domain}/preisvergleich/MainSearchProductCategory.html?q=${encodeURIComponent(ean)}`;
+  // Google Shopping search, restricted to the target idealo domain. Always
+  // hits idealo's actual product pages and surfaces the real market price
+  // without depending on idealo's locale-specific search URL structure.
+  const query = `${ean} site:${domain}`;
+  return `https://www.google.com/search?tbm=shop&q=${encodeURIComponent(query)}`;
 }
 
 function PreviewView({ preview }: { preview: NonNullable<Result['preview']> }) {
