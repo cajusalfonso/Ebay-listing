@@ -46,6 +46,8 @@ export interface PreviewData {
   qualityScore: number;
   suggestedCategoryId: string | null;
   imageCount: number;
+  imageUrls: readonly string[];
+  description: string | null;
   compliance: {
     passed: boolean;
     blockers: readonly string[];
@@ -201,6 +203,8 @@ export async function createListingAction(formData: FormData): Promise<ListingAc
     qualityScore: product.qualityScore,
     suggestedCategoryId: product.suggestedCategoryId,
     imageCount: product.images.length,
+    imageUrls: product.images.map((img) => img.url),
+    description: product.description,
     compliance: {
       passed: compliance.passed,
       blockers: compliance.blockers,

@@ -18,6 +18,8 @@ interface PreviewData {
   qualityScore: number;
   suggestedCategoryId: string | null;
   imageCount: number;
+  imageUrls: readonly string[];
+  description: string | null;
   compliance: {
     passed: boolean;
     blockers: readonly string[];
@@ -76,6 +78,29 @@ function PreviewView({ preview }: { preview: NonNullable<Result['preview']> }) {
           <span className="font-medium">{preview.primarySource}</span> · quality{' '}
           {preview.qualityScore}/100 · {preview.imageCount} images
         </p>
+        {preview.imageUrls.length > 0 ? (
+          <div className="mt-4 grid grid-cols-3 gap-2 md:grid-cols-5">
+            {preview.imageUrls.map((url, idx) => (
+              // eslint-disable-next-line @next/next/no-img-element
+              <a key={url} href={url} target="_blank" rel="noreferrer" className="block">
+                <img
+                  src={url}
+                  alt={`${preview.title} ${idx + 1}`}
+                  loading="lazy"
+                  className="aspect-square w-full rounded-md border border-gray-200 bg-white object-contain transition-opacity hover:opacity-75"
+                />
+              </a>
+            ))}
+          </div>
+        ) : null}
+        {preview.description ? (
+          <details className="mt-4 text-sm text-gray-600">
+            <summary className="cursor-pointer text-xs font-medium uppercase tracking-wider text-gray-500 hover:text-gray-700">
+              Beschreibung ({preview.description.length} Zeichen)
+            </summary>
+            <p className="mt-2 whitespace-pre-wrap">{preview.description}</p>
+          </details>
+        ) : null}
       </div>
 
       <div className="card">
