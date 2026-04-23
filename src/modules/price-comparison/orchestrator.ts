@@ -1,7 +1,7 @@
 import { eq } from 'drizzle-orm';
 import type { Database } from '../../db/client';
 import { priceComparisons } from '../../db/schema';
-import type { SerpApiProvider } from './serpApiProvider';
+import type { ProductQuery, SerpApiProvider } from './serpApiProvider';
 import type { PriceComparisonOffer, PriceComparisonSnapshot } from './types';
 
 const CACHE_TTL_MS = 24 * 60 * 60 * 1_000;
@@ -28,10 +28,11 @@ function sortByPrice(offers: readonly PriceComparisonOffer[]): PriceComparisonOf
  * SerpAPI quota. Cache is global (not per-user) — prices are market-level.
  */
 export async function getPriceComparison(
-  ean: string,
+  query: ProductQuery,
   provider: SerpApiProvider,
   db: Database
 ): Promise<PriceComparisonSnapshot> {
+  const { ean } = query;
   const now = Date.now();
   const threshold = new Date(now - CACHE_TTL_MS);
 
@@ -59,7 +60,7 @@ export async function getPriceComparison(
   }
 
   // Live fetch — provider handles DE + FR in parallel internally.
-  const liveOffers = await provider.fetchByEan(ean);
+  const liveOffers = await provider.fetchForProduct(query);
   const deOffers = liveOffers.filter((o) => o.country === 'DE');
   const frOffers = liveOffers.filter((o) => o.country === 'FR');
 

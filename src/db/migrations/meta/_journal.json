@@ -36,6 +36,13 @@
       "when": 1776934266816,
       "tag": "0004_clumsy_korath",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1777546800000,
+      "tag": "0005_clear_stale_price_cache",
+      "breakpoints": true
     }
   ]
 }

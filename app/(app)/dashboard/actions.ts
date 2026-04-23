@@ -229,7 +229,11 @@ export async function createListingAction(formData: FormData): Promise<ListingAc
   if (serpApiKey) {
     try {
       const serp = createSerpApiProvider({ apiKey: serpApiKey });
-      priceComparison = await getPriceComparison(ean, serp, db);
+      priceComparison = await getPriceComparison(
+        { ean, title: product.title, brand: product.brand, mpn: product.mpn },
+        serp,
+        db
+      );
     } catch (error) {
       priceComparisonError = error instanceof Error ? error.message : String(error);
     }
