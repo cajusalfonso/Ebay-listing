@@ -107,6 +107,7 @@ export default async function SettingsPage({ searchParams }: PageProps) {
             hasIcecatUser: false,
             hasIcecatPassword: false,
             hasDiscordWebhook: false,
+            hasSerpApiKey: false,
             ebayRedirectUriName: '',
             merchantLocationKey: '',
           }

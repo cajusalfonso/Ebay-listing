@@ -10,8 +10,12 @@ import {
   buildUserHttpClient,
   loadUserDiscordWebhook,
   loadUserIcecatCredentials,
+  loadUserSerpApiKey,
   MissingCredentialsError,
 } from '../../../lib/user-clients';
+import { getPriceComparison } from '../../../src/modules/price-comparison/orchestrator';
+import { createSerpApiProvider } from '../../../src/modules/price-comparison/serpApiProvider';
+import type { PriceComparisonSnapshot } from '../../../src/modules/price-comparison/types';
 import { listings, needsReview, products } from '../../../src/db/schema';
 import { checkCompliance } from '../../../src/modules/compliance/check';
 import { compileKeywordPatterns } from '../../../src/modules/compliance/keywords';
@@ -81,6 +85,25 @@ export interface PreviewData {
     marginPercent: number;
     belowMinProfit: boolean;
   } | null;
+  priceComparison: PriceComparisonPreview | null;
+  priceComparisonError: string | null;
+}
+
+export interface PriceComparisonOfferPreview {
+  seller: string;
+  title: string;
+  priceEur: number;
+  link: string;
+  thumbnail: string | null;
+  country: 'DE' | 'FR';
+}
+
+export interface PriceComparisonPreview {
+  offers: readonly PriceComparisonOfferPreview[];
+  cheapestDe: PriceComparisonOfferPreview | null;
+  cheapestFr: PriceComparisonOfferPreview | null;
+  source: 'cache' | 'live';
+  fetchedAt: string;
 }
 
 export interface PublishOutcome {
@@ -193,9 +216,24 @@ export async function createListingAction(formData: FormData): Promise<ListingAc
     keywordBlacklist: blacklist,
   });
 
-  // --- 4. Market ---
+  // --- 4a. Market (eBay Browse) ---
   const marketProvider = createEbayBrowseProvider(clients.browse);
   const marketSnapshot = await marketProvider.getLowestPriceByEan(ean);
+
+  // --- 4b. Price comparison (Google Shopping DE + FR via SerpAPI) ---
+  // Optional — only runs if the user has saved a SerpAPI key. Errors are
+  // caught and surfaced as a non-fatal warning so the pipeline continues.
+  let priceComparison: PriceComparisonSnapshot | null = null;
+  let priceComparisonError: string | null = null;
+  const serpApiKey = await loadUserSerpApiKey(userId, ebayEnv);
+  if (serpApiKey) {
+    try {
+      const serp = createSerpApiProvider({ apiKey: serpApiKey });
+      priceComparison = await getPriceComparison(ean, serp, db);
+    } catch (error) {
+      priceComparisonError = error instanceof Error ? error.message : String(error);
+    }
+  }
 
   // --- 5. Pricing ---
   const pricingRules = {
@@ -269,6 +307,16 @@ export async function createListingAction(formData: FormData): Promise<ListingAc
       marginPercent: suggestion.pricingResult.marginPercent,
     },
     customPricing,
+    priceComparison: priceComparison
+      ? {
+          offers: priceComparison.offers.map((o) => ({ ...o })),
+          cheapestDe: priceComparison.cheapestDe ? { ...priceComparison.cheapestDe } : null,
+          cheapestFr: priceComparison.cheapestFr ? { ...priceComparison.cheapestFr } : null,
+          source: priceComparison.source,
+          fetchedAt: priceComparison.fetchedAt.toISOString(),
+        }
+      : null,
+    priceComparisonError,
   };
 
   // --- Dry-run only? Return preview. ---

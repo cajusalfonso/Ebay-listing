@@ -45,6 +45,35 @@ interface PreviewData {
     marginPercent: number;
     belowMinProfit: boolean;
   } | null;
+  priceComparison: {
+    offers: readonly {
+      seller: string;
+      title: string;
+      priceEur: number;
+      link: string;
+      thumbnail: string | null;
+      country: 'DE' | 'FR';
+    }[];
+    cheapestDe: {
+      seller: string;
+      title: string;
+      priceEur: number;
+      link: string;
+      thumbnail: string | null;
+      country: 'DE' | 'FR';
+    } | null;
+    cheapestFr: {
+      seller: string;
+      title: string;
+      priceEur: number;
+      link: string;
+      thumbnail: string | null;
+      country: 'DE' | 'FR';
+    } | null;
+    source: 'cache' | 'live';
+    fetchedAt: string;
+  } | null;
+  priceComparisonError: string | null;
 }
 
 interface PublishOutcome {
@@ -207,6 +236,118 @@ function PreviewView({ preview }: { preview: NonNullable<Result['preview']> }) {
           Reason: <code className="rounded bg-white/60 px-1">{preview.pricing.reason}</code>
         </p>
       </div>
+
+      {preview.priceComparisonError ? (
+        <div className="card border border-amber-200 bg-amber-50 text-amber-800">
+          <h3 className="text-sm font-semibold">Preisvergleich fehlgeschlagen</h3>
+          <p className="mt-1 text-xs">{preview.priceComparisonError}</p>
+        </div>
+      ) : null}
+
+      {preview.priceComparison ? (
+        <div className="card">
+          <div className="mb-3 flex items-center justify-between">
+            <h3 className="text-sm font-semibold text-gray-900">
+              Preisvergleich (Google Shopping)
+            </h3>
+            <span className="rounded-full bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-600">
+              {preview.priceComparison.source === 'cache' ? 'cached' : 'live'} ·{' '}
+              {preview.priceComparison.offers.length} Angebote
+            </span>
+          </div>
+          <div className="mb-4 grid grid-cols-1 gap-3 md:grid-cols-2">
+            <div className="rounded-md border border-gray-200 p-3">
+              <p className="text-xs font-medium uppercase tracking-wider text-gray-500">
+                🇩🇪 Günstigste DE
+              </p>
+              {preview.priceComparison.cheapestDe ? (
+                <>
+                  <p className="mt-1 text-lg font-bold text-gray-900">
+                    {formatEur(preview.priceComparison.cheapestDe.priceEur)}
+                  </p>
+                  <a
+                    href={preview.priceComparison.cheapestDe.link}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="text-xs text-brand-600 hover:underline"
+                  >
+                    {preview.priceComparison.cheapestDe.seller} ↗
+                  </a>
+                </>
+              ) : (
+                <p className="mt-1 text-sm text-gray-400">Keine DE-Angebote</p>
+              )}
+            </div>
+            <div className="rounded-md border border-gray-200 p-3">
+              <p className="text-xs font-medium uppercase tracking-wider text-gray-500">
+                🇫🇷 Günstigste FR
+              </p>
+              {preview.priceComparison.cheapestFr ? (
+                <>
+                  <p className="mt-1 text-lg font-bold text-gray-900">
+                    {formatEur(preview.priceComparison.cheapestFr.priceEur)}
+                  </p>
+                  <a
+                    href={preview.priceComparison.cheapestFr.link}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="text-xs text-brand-600 hover:underline"
+                  >
+                    {preview.priceComparison.cheapestFr.seller} ↗
+                  </a>
+                </>
+              ) : (
+                <p className="mt-1 text-sm text-gray-400">Keine FR-Angebote</p>
+              )}
+            </div>
+          </div>
+          {preview.priceComparison.offers.length > 0 ? (
+            <details>
+              <summary className="cursor-pointer text-xs font-medium uppercase tracking-wider text-gray-500 hover:text-gray-700">
+                Alle Angebote ({preview.priceComparison.offers.length})
+              </summary>
+              <div className="mt-3 overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead className="text-left text-xs uppercase tracking-wider text-gray-500">
+                    <tr className="border-b border-gray-100">
+                      <th className="py-2 pr-4 font-medium">Shop</th>
+                      <th className="py-2 pr-4 font-medium">Land</th>
+                      <th className="py-2 pr-4 font-medium text-right">Preis</th>
+                      <th className="py-2 font-medium">Titel</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-100">
+                    {preview.priceComparison.offers.map((o, idx) => (
+                      <tr key={`${o.seller}-${o.link}-${idx}`} className="hover:bg-gray-50">
+                        <td className="py-2 pr-4 font-medium text-gray-900">
+                          <a
+                            href={o.link}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="text-brand-600 hover:underline"
+                          >
+                            {o.seller}
+                          </a>
+                        </td>
+                        <td className="py-2 pr-4 text-gray-500">{o.country}</td>
+                        <td className="py-2 pr-4 text-right font-medium text-gray-900">
+                          {formatEur(o.priceEur)}
+                        </td>
+                        <td className="py-2 text-xs text-gray-500" title={o.title}>
+                          {o.title.length > 60 ? `${o.title.slice(0, 60)}…` : o.title}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </details>
+          ) : null}
+          <p className="mt-3 text-[10px] text-gray-400">
+            Quelle: Google Shopping via SerpAPI. 24 h Cache pro EAN.
+          </p>
+        </div>
+      ) : null}
 
       {preview.customPricing ? (
         <div

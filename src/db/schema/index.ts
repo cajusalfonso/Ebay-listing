@@ -10,3 +10,4 @@ export * from './users';
 export * from './userCredentials';
 export * from './userEbayTokens';
 export * from './sessions';
+export * from './priceComparisons';

@@ -16,6 +16,7 @@ interface ExistingState {
   hasIcecatUser: boolean;
   hasIcecatPassword: boolean;
   hasDiscordWebhook: boolean;
+  hasSerpApiKey: boolean;
   ebayRedirectUriName: string;
   merchantLocationKey: string;
 }
@@ -277,6 +278,31 @@ export function CredentialsForm({ existing }: { existing: ExistingState }) {
           revealField="discordWebhookUrl"
           ebayEnv={env}
           helpText="Server → Channel Settings → Integrations → Webhooks → New Webhook"
+        />
+      </div>
+
+      <div className="card">
+        <h2 className="mb-1 text-lg font-semibold text-gray-900">Preisvergleich (SerpAPI)</h2>
+        <p className="mb-4 text-sm text-gray-500">
+          Optional. Aktiviert den Preisvergleich Google Shopping DE + FR im Preview (zeigt
+          günstigste Angebote von Amazon, Rakuten, MediaMarkt, Otto etc.). Key von{' '}
+          <a
+            href="https://serpapi.com/manage-api-key"
+            target="_blank"
+            rel="noreferrer"
+            className="text-brand-600 hover:underline"
+          >
+            serpapi.com
+          </a>
+          . 100 Searches/Monat gratis, ein Preview = max. 2 Searches (DE + FR). Ergebnisse werden
+          24 h gecacht pro EAN.
+        </p>
+        <SecretField
+          label="SerpAPI Key"
+          name="serpApiKey"
+          alreadySet={existing.hasSerpApiKey}
+          revealField="serpApiKey"
+          ebayEnv={env}
         />
       </div>
 

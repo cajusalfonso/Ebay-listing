@@ -24,6 +24,8 @@ export const userCredentials = pgTable(
     icecatUserEncrypted: text('icecat_user_encrypted'),
     icecatPasswordEncrypted: text('icecat_password_encrypted'),
     discordWebhookUrlEncrypted: text('discord_webhook_url_encrypted'),
+    /** SerpAPI key for Google Shopping price comparison (DE + FR). */
+    serpApiKeyEncrypted: text('serp_api_key_encrypted'),
     /** Merchant inventory location key registered in the user's eBay Seller Hub. */
     merchantLocationKey: text('merchant_location_key'),
     createdAt: timestamp('created_at', { withTimezone: true })

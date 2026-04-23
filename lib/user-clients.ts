@@ -91,6 +91,21 @@ export async function loadUserIcecatCredentials(
   };
 }
 
+export async function loadUserSerpApiKey(
+  userId: number,
+  ebayEnv: EbayEnvironment
+): Promise<string | null> {
+  const rows = await db
+    .select()
+    .from(userCredentials)
+    .where(and(eq(userCredentials.userId, userId), eq(userCredentials.ebayEnv, ebayEnv)))
+    .limit(1);
+  const row = rows[0];
+  if (!row?.serpApiKeyEncrypted) return null;
+  const key = getEncryptionKey();
+  return decrypt(row.serpApiKeyEncrypted, key);
+}
+
 export async function loadUserDiscordWebhook(
   userId: number,
   ebayEnv: EbayEnvironment

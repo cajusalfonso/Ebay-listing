@@ -38,6 +38,7 @@ const credentialsSchema = z.object({
       (v) => !v || v.startsWith('https://discord.com/api/webhooks/'),
       'Discord-Webhook-URL muss mit https://discord.com/api/webhooks/ beginnen.'
     ),
+  serpApiKey: z.string().trim().optional().or(z.literal('')),
   merchantLocationKey: z.string().trim().optional().or(z.literal('')),
 });
 
@@ -70,6 +71,7 @@ export async function saveCredentialsAction(
     icecatUser: formData.get('icecatUser') ?? '',
     icecatPassword: formData.get('icecatPassword') ?? '',
     discordWebhookUrl: formData.get('discordWebhookUrl') ?? '',
+    serpApiKey: formData.get('serpApiKey') ?? '',
     merchantLocationKey: formData.get('merchantLocationKey') ?? '',
   });
   if (!parsed.success) {
@@ -100,6 +102,7 @@ export async function saveCredentialsAction(
       icecatUserEncrypted: enc(key, data.icecatUser),
       icecatPasswordEncrypted: enc(key, data.icecatPassword),
       discordWebhookUrlEncrypted: enc(key, data.discordWebhookUrl),
+      serpApiKeyEncrypted: enc(key, data.serpApiKey),
       merchantLocationKey: data.merchantLocationKey || null,
     };
     await db.insert(userCredentials).values(toInsert);
@@ -112,6 +115,7 @@ export async function saveCredentialsAction(
     if (toInsert.icecatUserEncrypted) updatedLabels.push('Icecat User');
     if (toInsert.icecatPasswordEncrypted) updatedLabels.push('Icecat Password');
     if (toInsert.discordWebhookUrlEncrypted) updatedLabels.push('Discord Webhook');
+    if (toInsert.serpApiKeyEncrypted) updatedLabels.push('SerpAPI Key');
   } else {
     // UPDATE: only set fields where the user provided a new value.
     // Empty input means "keep existing" (matches the "Leerlassen zum Beibehalten" placeholder).
@@ -146,6 +150,11 @@ export async function saveCredentialsAction(
     if (newDiscord) {
       updateSet.discordWebhookUrlEncrypted = newDiscord;
       updatedLabels.push('Discord Webhook');
+    }
+    const newSerpApi = enc(key, data.serpApiKey);
+    if (newSerpApi) {
+      updateSet.serpApiKeyEncrypted = newSerpApi;
+      updatedLabels.push('SerpAPI Key');
     }
     // Plain-text fields: always update (the form pre-populates them with existing
     // value via defaultValue, so an empty submit means the user explicitly cleared).
@@ -192,6 +201,7 @@ export async function getCredentialsMaskedForUser(
   hasIcecatUser: boolean;
   hasIcecatPassword: boolean;
   hasDiscordWebhook: boolean;
+  hasSerpApiKey: boolean;
   ebayRedirectUriName: string;
   merchantLocationKey: string;
 } | null> {
@@ -213,6 +223,7 @@ export async function getCredentialsMaskedForUser(
       hasIcecatUser: false,
       hasIcecatPassword: false,
       hasDiscordWebhook: false,
+      hasSerpApiKey: false,
       ebayRedirectUriName: '',
       merchantLocationKey: '',
     };
@@ -224,6 +235,7 @@ export async function getCredentialsMaskedForUser(
     hasIcecatUser: row.icecatUserEncrypted !== null,
     hasIcecatPassword: row.icecatPasswordEncrypted !== null,
     hasDiscordWebhook: row.discordWebhookUrlEncrypted !== null,
+    hasSerpApiKey: row.serpApiKeyEncrypted !== null,
     ebayRedirectUriName: row.ebayRedirectUriName ?? '',
     merchantLocationKey: row.merchantLocationKey ?? '',
   };
@@ -235,7 +247,8 @@ export type RevealableField =
   | 'ebayDevId'
   | 'icecatUser'
   | 'icecatPassword'
-  | 'discordWebhookUrl';
+  | 'discordWebhookUrl'
+  | 'serpApiKey';
 
 const FIELD_TO_COLUMN: Record<RevealableField, keyof typeof userCredentials.$inferSelect> = {
   ebayAppId: 'ebayAppIdEncrypted',
@@ -244,6 +257,7 @@ const FIELD_TO_COLUMN: Record<RevealableField, keyof typeof userCredentials.$inf
   icecatUser: 'icecatUserEncrypted',
   icecatPassword: 'icecatPasswordEncrypted',
   discordWebhookUrl: 'discordWebhookUrlEncrypted',
+  serpApiKey: 'serpApiKeyEncrypted',
 };
 
 /**
