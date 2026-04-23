@@ -39,6 +39,12 @@ interface PreviewData {
     profitEur: number;
     marginPercent: number;
   };
+  customPricing: {
+    priceGross: number;
+    profitEur: number;
+    marginPercent: number;
+    belowMinProfit: boolean;
+  } | null;
 }
 
 interface PublishOutcome {
@@ -201,6 +207,59 @@ function PreviewView({ preview }: { preview: NonNullable<Result['preview']> }) {
           Reason: <code className="rounded bg-white/60 px-1">{preview.pricing.reason}</code>
         </p>
       </div>
+
+      {preview.customPricing ? (
+        <div
+          className={`card border ${
+            preview.customPricing.belowMinProfit
+              ? 'border-red-200 bg-red-50 text-red-700'
+              : 'border-blue-200 bg-blue-50 text-blue-700'
+          }`}
+        >
+          <div className="mb-3 flex items-center justify-between">
+            <h3 className="text-sm font-semibold">Dein Preis (Override)</h3>
+            {preview.customPricing.belowMinProfit ? (
+              <span className="rounded-full bg-white/60 px-2 py-0.5 text-xs font-medium uppercase">
+                unter Min-Marge
+              </span>
+            ) : (
+              <span className="rounded-full bg-white/60 px-2 py-0.5 text-xs font-medium uppercase">
+                überschreibt Empfehlung
+              </span>
+            )}
+          </div>
+          <dl className="grid grid-cols-2 gap-4 text-sm md:grid-cols-3">
+            <div>
+              <dt className="text-xs opacity-75">Dein Preis</dt>
+              <dd className="text-lg font-bold">
+                {formatEur(preview.customPricing.priceGross)}
+              </dd>
+            </div>
+            <div>
+              <dt className="text-xs opacity-75">Profit</dt>
+              <dd className="text-lg font-bold">
+                {formatEur(preview.customPricing.profitEur)}
+              </dd>
+            </div>
+            <div>
+              <dt className="text-xs opacity-75">Margin</dt>
+              <dd className="text-lg font-bold">
+                {formatPercent(preview.customPricing.marginPercent)}
+              </dd>
+            </div>
+          </dl>
+          {preview.customPricing.belowMinProfit ? (
+            <p className="mt-3 text-xs opacity-80">
+              Publish wird geblockt. Preis erhöhen oder Feld leeren, um den empfohlenen Preis zu
+              nutzen.
+            </p>
+          ) : (
+            <p className="mt-3 text-xs opacity-80">
+              Publish verwendet diesen Preis (nicht den empfohlenen).
+            </p>
+          )}
+        </div>
+      ) : null}
     </div>
   );
 }
@@ -244,13 +303,21 @@ export function CreateListingForm() {
   const [result, setResult] = useState<Result>({ ok: true });
   const [isPending, startTransition] = useTransition();
 
-  const submit = (ean: string, cogs: string, publish: boolean) => {
+  const submit = (ean: string, cogs: string, customPrice: string, publish: boolean) => {
     startTransition(async () => {
       try {
+        const body: Record<string, unknown> = {
+          ean,
+          cogs: Number(cogs),
+          publish,
+        };
+        const trimmed = customPrice.trim();
+        if (trimmed !== '') body.customPrice = Number(trimmed);
+
         const response = await fetch('/api/listings/run', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ ean, cogs: Number(cogs), publish }),
+          body: JSON.stringify(body),
         });
         const json = (await response.json()) as Result;
         setResult(json);
@@ -272,12 +339,13 @@ export function CreateListingForm() {
           const form = event.currentTarget;
           const ean = (form.elements.namedItem('ean') as HTMLInputElement).value;
           const cogs = (form.elements.namedItem('cogs') as HTMLInputElement).value;
+          const customPrice = (form.elements.namedItem('customPrice') as HTMLInputElement).value;
           const submitter = (event.nativeEvent as SubmitEvent).submitter as HTMLButtonElement | null;
           const publish = submitter?.name === 'publish';
-          submit(ean, cogs, publish);
+          submit(ean, cogs, customPrice, publish);
         }}
       >
-        <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
           <div>
             <label htmlFor="ean" className="mb-1 block text-sm font-medium text-gray-700">
               EAN / GTIN
@@ -305,6 +373,23 @@ export function CreateListingForm() {
               required
               className="input"
               placeholder="5.50"
+            />
+          </div>
+          <div>
+            <label
+              htmlFor="customPrice"
+              className="mb-1 block text-sm font-medium text-gray-700"
+            >
+              Dein Preis <span className="text-gray-400">(optional)</span>
+            </label>
+            <input
+              id="customPrice"
+              name="customPrice"
+              type="number"
+              step="0.01"
+              min="0.01"
+              className="input"
+              placeholder="leer = Empfehlung"
             />
           </div>
         </div>

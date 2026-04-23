@@ -27,6 +27,7 @@ import { createEbayCatalogSource } from '../../../src/modules/product-data/sourc
 import { createIcecatSource } from '../../../src/modules/product-data/sources/icecat';
 import { createIcecatClient } from '../../../src/modules/product-data/sources/icecatClient';
 import { suggestSellPrice } from '../../../src/modules/pricing/strategy';
+import { calculatePricing } from '../../../src/modules/pricing/pricing';
 
 const inputSchema = z.object({
   ean: z
@@ -34,6 +35,13 @@ const inputSchema = z.object({
     .trim()
     .regex(/^\d{8,14}$/, 'EAN must be 8–14 digits'),
   cogs: z.coerce.number().positive('COGS must be > 0'),
+  customPrice: z
+    .union([z.string(), z.number(), z.undefined(), z.null()])
+    .transform((v) => {
+      if (v === null || v === undefined || v === '') return undefined;
+      const n = typeof v === 'number' ? v : Number(v);
+      return Number.isFinite(n) && n > 0 ? n : undefined;
+    }),
   publish: z
     .union([z.literal('on'), z.literal('true'), z.boolean(), z.undefined(), z.null()])
     .transform((v) => v === 'on' || v === 'true' || v === true),
@@ -67,6 +75,12 @@ export interface PreviewData {
     profitEur: number;
     marginPercent: number;
   };
+  customPricing: {
+    priceGross: number;
+    profitEur: number;
+    marginPercent: number;
+    belowMinProfit: boolean;
+  } | null;
 }
 
 export interface PublishOutcome {
@@ -102,6 +116,7 @@ export async function createListingAction(formData: FormData): Promise<ListingAc
   const parsed = inputSchema.safeParse({
     ean: formData.get('ean'),
     cogs: formData.get('cogs'),
+    customPrice: formData.get('customPrice'),
     publish: formData.get('publish'),
   });
   if (!parsed.success) {
@@ -109,7 +124,7 @@ export async function createListingAction(formData: FormData): Promise<ListingAc
   }
 
   const ebayEnv: 'sandbox' | 'production' = 'sandbox';
-  const { ean, cogs, publish: shouldPublish } = parsed.data;
+  const { ean, cogs, customPrice, publish: shouldPublish } = parsed.data;
 
   // --- 1. Build per-user clients (fails early if creds missing) ---
   let clients;
@@ -183,7 +198,7 @@ export async function createListingAction(formData: FormData): Promise<ListingAc
   const marketSnapshot = await marketProvider.getLowestPriceByEan(ean);
 
   // --- 5. Pricing ---
-  const suggestion = suggestSellPrice(marketSnapshot, cogs, 0.12, {
+  const pricingRules = {
     vatRate: 0.19,
     shippingCostToMe: 0,
     shippingChargedToBuyer: 0,
@@ -194,7 +209,36 @@ export async function createListingAction(formData: FormData): Promise<ListingAc
     minMarginPercent: 0.08,
     undercutAmount: 0.5,
     targetMarginMultiplier: 1.25,
-  });
+  };
+  const suggestion = suggestSellPrice(marketSnapshot, cogs, 0.12, pricingRules);
+
+  // Custom price override: recalculate profit + margin for the user-supplied
+  // price so they can see exactly what they'll earn at that number. We flag
+  // `belowMinProfit` if the custom price dips under the app's min-profit rules
+  // (warning, not blocker — user's choice).
+  const customPricing = (() => {
+    if (customPrice === undefined) return null;
+    const result = calculatePricing({
+      cogs,
+      cogsIncludesVat: false,
+      targetSellPriceGross: customPrice,
+      vatRate: pricingRules.vatRate,
+      shippingCostToMe: pricingRules.shippingCostToMe,
+      shippingChargedToBuyer: pricingRules.shippingChargedToBuyer,
+      ebayCategoryFeePercent: 0.12,
+      ebayFixedFeePerOrder: pricingRules.ebayFixedFeePerOrder,
+      ebayStoreFeeAllocation: pricingRules.ebayStoreFeeAllocation,
+      returnReservePercent: pricingRules.returnReservePercent,
+      minAbsoluteProfit: pricingRules.minAbsoluteProfit,
+      minMarginPercent: pricingRules.minMarginPercent,
+    });
+    return {
+      priceGross: customPrice,
+      profitEur: result.absoluteProfit,
+      marginPercent: result.marginPercent,
+      belowMinProfit: result.violatedRules.length > 0,
+    };
+  })();
 
   const preview: PreviewData = {
     title: product.title,
@@ -224,6 +268,7 @@ export async function createListingAction(formData: FormData): Promise<ListingAc
       profitEur: suggestion.pricingResult.absoluteProfit,
       marginPercent: suggestion.pricingResult.marginPercent,
     },
+    customPricing,
   };
 
   // --- Dry-run only? Return preview. ---
@@ -245,7 +290,10 @@ export async function createListingAction(formData: FormData): Promise<ListingAc
       error: `Compliance blockiert Publish: ${compliance.blockers.join(', ')}`,
     };
   }
-  if (suggestion.decision !== 'list') {
+  // If the user didn't supply a custom price AND the suggestion would skip,
+  // honor the skip. If the user DID supply a custom price, they're overriding
+  // the strategy — we still block if the custom price is unprofitable.
+  if (customPricing === null && suggestion.decision !== 'list') {
     await db.insert(needsReview).values({
       userId,
       ean,
@@ -259,6 +307,13 @@ export async function createListingAction(formData: FormData): Promise<ListingAc
       ok: false,
       preview,
       error: `Pricing-Entscheidung = ${suggestion.decision} (${suggestion.reason}). Nicht veröffentlicht.`,
+    };
+  }
+  if (customPricing !== null && customPricing.belowMinProfit) {
+    return {
+      ok: false,
+      preview,
+      error: `Dein Preis €${customPricing.priceGross.toFixed(2)} unterschreitet die Mindestmarge (${customPricing.profitEur.toFixed(2)}€ Profit). Preis erhöhen oder Feld leeren.`,
     };
   }
   if (!product.suggestedCategoryId) {
@@ -345,10 +400,17 @@ export async function createListingAction(formData: FormData): Promise<ListingAc
       quantity: 1,
     });
 
+    // The actual price published to eBay is either the custom override (if
+    // the user typed one) or the strategy's recommendation.
+    const finalPriceGross = customPricing?.priceGross ?? suggestion.recommendedPriceGross;
+    const finalProfitEur = customPricing?.profitEur ?? suggestion.pricingResult.absoluteProfit;
+    const finalMarginPercent =
+      customPricing?.marginPercent ?? suggestion.pricingResult.marginPercent;
+
     const { offerId } = await inventoryClient.createOffer({
       sku,
       categoryId: product.suggestedCategoryId,
-      priceValueEur: suggestion.recommendedPriceGross,
+      priceValueEur: finalPriceGross,
       listingDescription: product.description ?? product.title,
       fulfillmentPolicyId: policies.fulfillmentPolicyId,
       paymentPolicyId: policies.paymentPolicyId,
@@ -365,10 +427,10 @@ export async function createListingAction(formData: FormData): Promise<ListingAc
       ebaySku: sku,
       ebayOfferId: offerId,
       ebayListingId: listingId,
-      sellPriceGross: suggestion.recommendedPriceGross.toFixed(2),
+      sellPriceGross: finalPriceGross.toFixed(2),
       cogs: cogs.toFixed(2),
-      calculatedProfit: suggestion.pricingResult.absoluteProfit.toFixed(2),
-      calculatedMargin: suggestion.pricingResult.marginPercent.toFixed(4),
+      calculatedProfit: finalProfitEur.toFixed(2),
+      calculatedMargin: finalMarginPercent.toFixed(4),
       status: 'published',
       compliancePassed: true,
       complianceBlockers: null,
@@ -385,9 +447,9 @@ export async function createListingAction(formData: FormData): Promise<ListingAc
         categoryName: product.suggestedCategoryId,
         categoryId: product.suggestedCategoryId,
         cogsEur: cogs,
-        sellPriceGrossEur: suggestion.recommendedPriceGross,
-        profitEur: suggestion.pricingResult.absoluteProfit,
-        marginPercent: suggestion.pricingResult.marginPercent,
+        sellPriceGrossEur: finalPriceGross,
+        profitEur: finalProfitEur,
+        marginPercent: finalMarginPercent,
         competitorCount: marketSnapshot.competitorCount,
         lowestCompetitorEur: marketSnapshot.lowestPrice,
         marketPosition: suggestion.marketPosition,
@@ -422,7 +484,7 @@ export async function createListingAction(formData: FormData): Promise<ListingAc
       ean: product.ean,
       ebayEnvironment: ebayEnv,
       ebaySku: sku,
-      sellPriceGross: suggestion.recommendedPriceGross.toFixed(2),
+      sellPriceGross: (customPricing?.priceGross ?? suggestion.recommendedPriceGross).toFixed(2),
       cogs: cogs.toFixed(2),
       status: 'failed',
       compliancePassed: true,
