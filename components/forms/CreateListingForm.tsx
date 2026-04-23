@@ -12,6 +12,7 @@ interface ListingActionResult {
 }
 
 interface PreviewData {
+  ean: string;
   title: string;
   brand: string | null;
   primarySource: string;
@@ -93,6 +94,20 @@ function formatEur(value: number | null): string {
 
 function formatPercent(value: number): string {
   return `${(value * 100).toFixed(2)}%`;
+}
+
+// Idealo doesn't expose an API but their public search accepts an EAN via
+// ?q=. Each domain has its own index (DE/FR/AT/UK) so the user can spot-check
+// real market prices per country without leaving the page.
+const IDEALO_DOMAINS: readonly { flag: string; label: string; domain: string }[] = [
+  { flag: '🇩🇪', label: 'idealo.de', domain: 'idealo.de' },
+  { flag: '🇫🇷', label: 'idealo.fr', domain: 'idealo.fr' },
+  { flag: '🇦🇹', label: 'idealo.at', domain: 'idealo.at' },
+  { flag: '🇬🇧', label: 'idealo.co.uk', domain: 'idealo.co.uk' },
+];
+
+function idealoSearchUrl(domain: string, ean: string): string {
+  return `https://www.${domain}/preisvergleich/MainSearchProductCategory.html?q=${encodeURIComponent(ean)}`;
 }
 
 function PreviewView({ preview }: { preview: NonNullable<Result['preview']> }) {
@@ -235,6 +250,36 @@ function PreviewView({ preview }: { preview: NonNullable<Result['preview']> }) {
         <p className="mt-3 text-xs opacity-75">
           Reason: <code className="rounded bg-white/60 px-1">{preview.pricing.reason}</code>
         </p>
+      </div>
+
+      <div className="card">
+        <div className="mb-3 flex items-center justify-between">
+          <h3 className="text-sm font-semibold text-gray-900">Idealo Preisvergleich</h3>
+          <span className="text-xs text-gray-500">EAN: {preview.ean}</span>
+        </div>
+        <p className="mb-3 text-xs text-gray-500">
+          Idealo hat keine API — aber die Suche per EAN funktioniert direkt. Ein Klick öffnet den
+          Preisvergleich im neuen Tab.
+        </p>
+        <div className="grid grid-cols-2 gap-2 md:grid-cols-4">
+          {IDEALO_DOMAINS.map((d) => (
+            <a
+              key={d.domain}
+              href={idealoSearchUrl(d.domain, preview.ean)}
+              target="_blank"
+              rel="noreferrer"
+              className="group flex items-center gap-2 rounded-md border border-gray-200 p-3 transition-colors hover:border-brand-300 hover:bg-brand-50"
+            >
+              <span className="text-xl">{d.flag}</span>
+              <div className="flex flex-col">
+                <span className="text-sm font-medium text-gray-900 group-hover:text-brand-700">
+                  {d.label}
+                </span>
+                <span className="text-[10px] text-gray-400">Preis ansehen ↗</span>
+              </div>
+            </a>
+          ))}
+        </div>
       </div>
 
       {preview.priceComparisonError ? (

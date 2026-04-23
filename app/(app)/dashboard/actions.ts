@@ -52,6 +52,7 @@ const inputSchema = z.object({
 });
 
 export interface PreviewData {
+  ean: string;
   title: string;
   brand: string | null;
   primarySource: string;
@@ -283,6 +284,7 @@ export async function createListingAction(formData: FormData): Promise<ListingAc
   })();
 
   const preview: PreviewData = {
+    ean: product.ean,
     title: product.title,
     brand: product.brand,
     primarySource: product.primarySource,

@@ -123,7 +123,7 @@ export interface SerpApiConfig {
   /**
    * Offers priced below this fraction of the median price are discarded as
    * obvious mismatches (cases, cables, accessories listing the EAN). Default
-   * 0.3 — i.e. anything under 30% of the median is dropped.
+   * 0.5 — i.e. anything under 50% of the median is dropped.
    */
   readonly outlierFloor?: number;
 }
@@ -173,14 +173,19 @@ function removePriceOutliers(
   if (offers.length < 3) return [...offers];
   const med = median(offers.map((o) => o.priceEur));
   if (med === null) return [...offers];
-  const threshold = med * floor;
+  // Anything under `floor` * median is a mismatch. For expensive products
+  // (median > €100) also apply an absolute €20 floor — nothing legitimate
+  // costs that little for a flagship phone or laptop.
+  const relativeThreshold = med * floor;
+  const absoluteFloor = med > 100 ? 20 : 0;
+  const threshold = Math.max(relativeThreshold, absoluteFloor);
   return offers.filter((o) => o.priceEur >= threshold);
 }
 
 export function createSerpApiProvider(config: SerpApiConfig): SerpApiProvider {
   const endpoint = config.endpoint ?? SERP_API_ENDPOINT;
   const perCountryLimit = config.perCountryLimit ?? 15;
-  const outlierFloor = config.outlierFloor ?? 0.3;
+  const outlierFloor = config.outlierFloor ?? 0.5;
 
   async function fetchCountry(
     q: string,
