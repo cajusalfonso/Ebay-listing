@@ -11,3 +11,4 @@ export * from './userCredentials';
 export * from './userEbayTokens';
 export * from './sessions';
 export * from './priceComparisons';
+export * from './userPricingSettings';

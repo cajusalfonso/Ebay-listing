@@ -3,7 +3,9 @@ import { CredentialsForm } from '../../../components/forms/CredentialsForm';
 import { EbayConnectCard } from '../../../components/forms/EbayConnectCard';
 import { EbayManualTokenForm } from '../../../components/forms/EbayManualTokenForm';
 import { GpsrOverrideForm } from '../../../components/forms/GpsrOverrideForm';
+import { PricingSettingsForm } from '../../../components/forms/PricingSettingsForm';
 import { isEbayConnected } from '../../../lib/user-clients';
+import { loadUserPricingSettings, PRICING_SETTINGS_DEFAULTS } from '../../../lib/pricing-settings';
 import { getCredentialsMaskedForUser } from './actions';
 import { listGpsrOverrides } from './gpsr-actions';
 import { safeLoad } from '../../../lib/safe-load';
@@ -66,9 +68,13 @@ export default async function SettingsPage({ searchParams }: PageProps) {
   }
 
   const gpsrStep = await safeLoad('listGpsrOverrides', () => listGpsrOverrides());
+  const pricingStep = await safeLoad('loadUserPricingSettings', () =>
+    loadUserPricingSettings(userId)
+  );
   const existing = existingStep.value;
   const connection = connectionStep.value;
   const gpsrOverrides = gpsrStep.ok ? gpsrStep.value : [];
+  const pricingSettings = pricingStep.ok ? pricingStep.value : PRICING_SETTINGS_DEFAULTS;
 
   const params = await searchParams;
   const connectedEnv = params.connected;
@@ -122,6 +128,8 @@ export default async function SettingsPage({ searchParams }: PageProps) {
       />
 
       <EbayManualTokenForm ebayEnv={ebayEnv} />
+
+      <PricingSettingsForm current={pricingSettings} />
 
       <GpsrOverrideForm existing={gpsrOverrides} />
     </div>

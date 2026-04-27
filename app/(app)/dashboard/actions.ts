@@ -13,6 +13,7 @@ import {
   loadUserSerpApiKey,
   MissingCredentialsError,
 } from '../../../lib/user-clients';
+import { loadUserPricingSettings } from '../../../lib/pricing-settings';
 import { getPriceComparison } from '../../../src/modules/price-comparison/orchestrator';
 import { createSerpApiProvider } from '../../../src/modules/price-comparison/serpApiProvider';
 import type { PriceComparisonSnapshot } from '../../../src/modules/price-comparison/types';
@@ -241,19 +242,27 @@ export async function createListingAction(formData: FormData): Promise<ListingAc
   }
 
   // --- 5. Pricing ---
+  // Load user-configurable thresholds (Settings → Profitability). Falls back
+  // to sensible defaults for accounts that haven't customized them yet.
+  const userPricing = await loadUserPricingSettings(userId);
   const pricingRules = {
-    vatRate: 0.19,
+    vatRate: userPricing.vatRate,
     shippingCostToMe: 0,
     shippingChargedToBuyer: 0,
     ebayFixedFeePerOrder: 0.35,
     ebayStoreFeeAllocation: 0,
-    returnReservePercent: 0.03,
-    minAbsoluteProfit: 10,
-    minMarginPercent: 0.08,
-    undercutAmount: 0.5,
-    targetMarginMultiplier: 1.25,
+    returnReservePercent: userPricing.returnReservePercent,
+    minAbsoluteProfit: userPricing.minProfitEur,
+    minMarginPercent: userPricing.minMarginPercent,
+    undercutAmount: userPricing.undercutAmountEur,
+    targetMarginMultiplier: userPricing.targetMarginMultiplier,
   };
-  const suggestion = suggestSellPrice(marketSnapshot, cogs, 0.12, pricingRules);
+  const suggestion = suggestSellPrice(
+    marketSnapshot,
+    cogs,
+    userPricing.categoryFeePercent,
+    pricingRules
+  );
 
   // Custom price override: recalculate profit + margin for the user-supplied
   // price so they can see exactly what they'll earn at that number. We flag
@@ -268,7 +277,7 @@ export async function createListingAction(formData: FormData): Promise<ListingAc
       vatRate: pricingRules.vatRate,
       shippingCostToMe: pricingRules.shippingCostToMe,
       shippingChargedToBuyer: pricingRules.shippingChargedToBuyer,
-      ebayCategoryFeePercent: 0.12,
+      ebayCategoryFeePercent: userPricing.categoryFeePercent,
       ebayFixedFeePerOrder: pricingRules.ebayFixedFeePerOrder,
       ebayStoreFeeAllocation: pricingRules.ebayStoreFeeAllocation,
       returnReservePercent: pricingRules.returnReservePercent,
