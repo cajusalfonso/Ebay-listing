@@ -46,6 +46,25 @@ pnpm dev
 #   → http://localhost:3000
 ```
 
+## Deployment (Vercel + Supabase)
+
+1. **Supabase**: EU-Projekt anlegen, dann Migrationen anwenden
+   (`supabase db push`, siehe [`supabase/README.md`](./supabase/README.md)).
+2. **Vercel**: Repository importieren und als **Root Directory** `hostflow`
+   wählen. Alle Variablen aus `.env.example` als Environment Variables setzen.
+3. **Stripe**: Produkte/Preise für Plan S/M/L + Setup-Gebühr anlegen, deren
+   Price-IDs eintragen. Webhook-Endpoint auf
+   `https://<domain>/api/stripe/webhook` zeigen lassen
+   (`customer.subscription.*`, `checkout.session.completed`) und das
+   Signing-Secret als `STRIPE_WEBHOOK_SECRET` hinterlegen.
+4. **iCal-Cron**: `CRON_SECRET` setzen. Der stündliche Sync ist in
+   [`vercel.json`](./vercel.json) als Vercel-Cron auf `/api/cron/sync`
+   konfiguriert; Vercel sendet den `Authorization: Bearer <CRON_SECRET>`-Header
+   automatisch.
+
+> Ohne Stripe-Keys läuft die App vollständig (Billing-Seite zeigt „nicht
+> aktiviert", keine Nutzungseinschränkung).
+
 ### Supabase-Projekt anlegen (DSGVO)
 
 1. Auf [supabase.com](https://supabase.com) ein neues Projekt erstellen.
@@ -120,7 +139,7 @@ strikt pro Organization über **RLS**.
 - [x] **Phase 6** — Tasks (Zuweisung, Foto-Upload, Status, activity_log)
 - [x] **Phase 7** — Time-Entries + Kostenauswertung
 - [x] **Phase 8** — Stripe (Abo + einmalig + Trial + Customer Portal + Webhooks)
-- [ ] **Phase 9** — DSGVO-Seiten + Account-Löschung + Politur
+- [x] **Phase 9** — DSGVO-Seiten + Account-Löschung + Politur
 
 ### Changelog
 
@@ -192,3 +211,10 @@ strikt pro Organization über **RLS**.
   Anlegen erzwungen. Die App startet **auch ohne Stripe-Keys** (zeigt dann
   „Abrechnung nicht aktiviert", keine Einschränkung). Access- & Plan-Logik mit
   7 Unit-Tests; Webhook-Update gegen echtes Postgres verifiziert.
+- **Phase 9** — DSGVO & Politur: ausgefüllte Vorlagen für Datenschutzerklärung,
+  Impressum und AGB (mit Platzhaltern + Hinweis zur rechtlichen Prüfung).
+  Selbstbedienungs-**Account-Löschung** für Inhaber (`/einstellungen`,
+  Bestätigung per Namenseingabe): kündigt Stripe-Abos, löscht Storage-Fotos, die
+  Organisation samt aller Daten (Cascade) und die Auth-Konten. Politur:
+  einheitliche leere Zustände, freundliche 404-Seite, Lade- und Fehler-Boundary
+  für den App-Bereich, durchgängig mobil-first.

@@ -8,7 +8,6 @@ import { openPortal, startCheckout } from "@/lib/billing/actions";
 import type { ActionState } from "@/lib/auth/actions";
 import type { Plan, SubscriptionStatus } from "@/lib/types";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
 import {
   Card,
   CardContent,
