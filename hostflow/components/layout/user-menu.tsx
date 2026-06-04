@@ -1,6 +1,7 @@
 "use client";
 
-import { LogOut, User } from "lucide-react";
+import Link from "next/link";
+import { CreditCard, LogOut, User } from "lucide-react";
 
 import { logout } from "@/lib/auth/actions";
 import {
@@ -57,6 +58,13 @@ export function UserMenu({
         <DropdownMenuItem disabled>
           <User className="h-4 w-4" /> Mein Profil
         </DropdownMenuItem>
+        {role === "owner" && (
+          <DropdownMenuItem asChild>
+            <Link href="/abo">
+              <CreditCard className="h-4 w-4" /> Abo & Abrechnung
+            </Link>
+          </DropdownMenuItem>
+        )}
         <DropdownMenuSeparator />
         <form action={logout}>
           <button type="submit" className="w-full">

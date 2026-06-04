@@ -6,6 +6,7 @@ import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentUser } from "@/lib/data/profile";
 import { isStaffRole, type UserRole } from "@/lib/types";
+import { readOnlyError } from "@/lib/billing/access";
 import type { ActionState } from "@/lib/auth/actions";
 
 const ROLES = ["owner", "manager", "cleaner", "maintenance"] as const;
@@ -34,6 +35,8 @@ export async function inviteMember(
 ): Promise<ActionState> {
   const current = await requireStaff();
   if (!current) return { error: "Keine Berechtigung." };
+  const ro = readOnlyError(current.organization);
+  if (ro) return { error: ro };
 
   const parsed = inviteSchema.safeParse({
     email: formData.get("email"),

@@ -5,6 +5,7 @@ import { z } from "zod";
 
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentUser } from "@/lib/data/profile";
+import { readOnlyError } from "@/lib/billing/access";
 import type { ActionState } from "@/lib/auth/actions";
 
 const entrySchema = z
@@ -39,6 +40,8 @@ export async function createTimeEntry(
 ): Promise<ActionState> {
   const current = await getCurrentUser();
   if (!current) return { error: "Nicht angemeldet." };
+  const ro = readOnlyError(current.organization);
+  if (ro) return { error: ro };
 
   const parsed = entrySchema.safeParse({
     property_id: formData.get("property_id"),

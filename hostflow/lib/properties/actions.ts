@@ -6,6 +6,8 @@ import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentUser } from "@/lib/data/profile";
 import { isStaffRole } from "@/lib/types";
+import { readOnlyError } from "@/lib/billing/access";
+import { maxPropertiesForPlan, PLANS } from "@/lib/stripe/plans";
 import type { ActionState } from "@/lib/auth/actions";
 
 const optionalNumber = z
@@ -58,6 +60,8 @@ export async function createProperty(
 ): Promise<ActionState> {
   const current = await requireStaff();
   if (!current) return { error: "Keine Berechtigung." };
+  const ro = readOnlyError(current.organization);
+  if (ro) return { error: ro };
 
   const parsed = parseForm(formData);
   if (!parsed.success) {
@@ -65,6 +69,24 @@ export async function createProperty(
   }
 
   const supabase = await createClient();
+
+  // Tarifgrenze prüfen (nur bei gebuchtem Plan).
+  const limit = maxPropertiesForPlan(current.organization.plan);
+  if (limit != null) {
+    const { count } = await supabase
+      .from("properties")
+      .select("id", { count: "exact", head: true })
+      .eq("organization_id", current.organization.id);
+    if ((count ?? 0) >= limit) {
+      const planName = current.organization.plan
+        ? PLANS[current.organization.plan].name
+        : "";
+      return {
+        error: `Tarifgrenze erreicht (${limit} Objekte im Tarif ${planName}). Bitte upgraden.`,
+      };
+    }
+  }
+
   const { data, error } = await supabase
     .from("properties")
     .insert({ ...parsed.data, organization_id: current.organization.id })
@@ -93,6 +115,8 @@ export async function updateProperty(
 ): Promise<ActionState> {
   const current = await requireStaff();
   if (!current) return { error: "Keine Berechtigung." };
+  const ro = readOnlyError(current.organization);
+  if (ro) return { error: ro };
 
   const id = formData.get("id");
   if (typeof id !== "string") return { error: "Ungültige Anfrage." };

@@ -5,6 +5,7 @@ import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentUser } from "@/lib/data/profile";
 import { isStaffRole } from "@/lib/types";
+import { readOnlyError } from "@/lib/billing/access";
 import { syncProperty } from "@/lib/ical/sync";
 import type { ActionState } from "@/lib/auth/actions";
 
@@ -17,6 +18,8 @@ export async function syncPropertyAction(
   if (!current || !isStaffRole(current.profile.role)) {
     return { error: "Keine Berechtigung." };
   }
+  const ro = readOnlyError(current.organization);
+  if (ro) return { error: ro };
 
   const propertyId = formData.get("propertyId");
   if (typeof propertyId !== "string") return { error: "Ungültige Anfrage." };

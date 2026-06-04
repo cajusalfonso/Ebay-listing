@@ -119,7 +119,7 @@ strikt pro Organization über **RLS**.
 - [x] **Phase 5** — iCal-Sync + automatische Reinigungsaufgaben
 - [x] **Phase 6** — Tasks (Zuweisung, Foto-Upload, Status, activity_log)
 - [x] **Phase 7** — Time-Entries + Kostenauswertung
-- [ ] **Phase 8** — Stripe (Abo + einmalig + Trial + Customer Portal + Webhooks)
+- [x] **Phase 8** — Stripe (Abo + einmalig + Trial + Customer Portal + Webhooks)
 - [ ] **Phase 9** — DSGVO-Seiten + Account-Löschung + Politur
 
 ### Changelog
@@ -182,3 +182,13 @@ strikt pro Organization über **RLS**.
   pro Objekt" und 6-Monats-Verlauf (recharts) plus Einzelposten. XOR-Constraint
   (Stunden ODER Pauschale) und Zeit-RLS (nur eigene Einträge) gegen echtes
   Postgres verifiziert.
+- **Phase 8** — Stripe-Billing (`/abo`, nur Inhaber): Tarife nach Objektanzahl
+  (S/M/L), monatliches Abo + einmalige Setup-Gebühr beim ersten Kauf,
+  Checkout-Session und **Customer Portal** (Self-Service-Kündigung). 14-Tage-
+  Trial; nach Ablauf ohne Abo greift ein **Nur-Lese-Modus** (Banner + alle
+  schreibenden Aktionen blockiert) mit Upgrade-Hinweis. Stripe-Webhooks
+  (`/api/stripe/webhook`, signaturgeprüft) aktualisieren
+  `subscription_status`/`plan` per Service-Role. Objekt-Tarifgrenzen werden beim
+  Anlegen erzwungen. Die App startet **auch ohne Stripe-Keys** (zeigt dann
+  „Abrechnung nicht aktiviert", keine Einschränkung). Access- & Plan-Logik mit
+  7 Unit-Tests; Webhook-Update gegen echtes Postgres verifiziert.

@@ -6,6 +6,7 @@ import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentUser } from "@/lib/data/profile";
 import { isStaffRole } from "@/lib/types";
+import { readOnlyError } from "@/lib/billing/access";
 import {
   TASK_STATUSES,
   TASK_STATUS_LABELS,
@@ -57,6 +58,8 @@ export async function createTask(
 ): Promise<ActionState> {
   const current = await requireStaff();
   if (!current) return { error: "Keine Berechtigung." };
+  const ro = readOnlyError(current.organization);
+  if (ro) return { error: ro };
 
   const parsed = parseTask(formData);
   if (!parsed.success) {
@@ -92,6 +95,9 @@ export async function updateTask(
 ): Promise<ActionState> {
   const current = await requireStaff();
   if (!current) return { error: "Keine Berechtigung." };
+
+  const ro = readOnlyError(current.organization);
+  if (ro) return { error: ro };
 
   const id = formData.get("id");
   if (typeof id !== "string") return { error: "Ungültige Anfrage." };
@@ -161,6 +167,8 @@ export async function setTaskStatus(
 ): Promise<ActionState> {
   const current = await getCurrentUser();
   if (!current) return { error: "Nicht angemeldet." };
+  const ro = readOnlyError(current.organization);
+  if (ro) return { error: ro };
 
   const parsed = statusSchema.safeParse({
     id: formData.get("id"),
@@ -222,6 +230,8 @@ export async function recordTaskPhoto(
 ): Promise<{ error?: string }> {
   const current = await getCurrentUser();
   if (!current) return { error: "Nicht angemeldet." };
+  const ro = readOnlyError(current.organization);
+  if (ro) return { error: ro };
 
   const supabase = await createClient();
   const { error } = await supabase.from("task_photos").insert({

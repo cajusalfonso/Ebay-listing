@@ -1,8 +1,11 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 
+import { AlertTriangle } from "lucide-react";
+
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentUser } from "@/lib/data/profile";
+import { getAccess } from "@/lib/billing/access";
 import { MainNav } from "@/components/layout/main-nav";
 import { UserMenu } from "@/components/layout/user-menu";
 
@@ -26,6 +29,8 @@ export default async function AppLayout({
   }
 
   const { profile, organization, email } = current;
+  const access = getAccess(organization);
+  const isOwner = profile.role === "owner";
 
   return (
     <div className="flex min-h-screen flex-col">
@@ -53,6 +58,29 @@ export default async function AppLayout({
           <MainNav role={profile.role} />
         </div>
       </header>
+
+      {access.readOnly && (
+        <div className="border-b border-destructive/30 bg-destructive/10">
+          <div className="container flex flex-wrap items-center gap-2 py-2 text-sm">
+            <AlertTriangle className="h-4 w-4 shrink-0 text-destructive" />
+            <span className="text-destructive">
+              Nur-Lese-Modus: Deine Testphase ist abgelaufen.
+            </span>
+            {isOwner ? (
+              <Link
+                href="/abo"
+                className="font-medium text-destructive underline underline-offset-2"
+              >
+                Jetzt Tarif wählen
+              </Link>
+            ) : (
+              <span className="text-muted-foreground">
+                Bitte wende dich an den Inhaber.
+              </span>
+            )}
+          </div>
+        </div>
+      )}
 
       <main className="container flex-1 py-6">{children}</main>
     </div>
