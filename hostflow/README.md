@@ -113,7 +113,7 @@ strikt pro Organization über **RLS**.
 
 - [x] **Phase 1** — Projekt-Setup: Next.js + Tailwind + shadcn/ui + Supabase-Clients + Env-Struktur + README
 - [x] **Phase 2** — DB-Schema + RLS-Policies (Migrations) + Seed-Daten
-- [ ] **Phase 3** — Auth + Onboarding + Organization + Team-Einladungen
+- [x] **Phase 3** — Auth + Onboarding + Organization + Team-Einladungen
 - [ ] **Phase 4** — Properties CRUD + Dashboard mit Status-Ampel
 - [ ] **Phase 5** — iCal-Sync + automatische Reinigungsaufgaben
 - [ ] **Phase 6** — Tasks (Zuweisung, Foto-Upload, Status, activity_log)
@@ -136,3 +136,13 @@ strikt pro Organization über **RLS**.
   privater Storage-Bucket für Aufgaben-Fotos, Seed mit zwei Tenants und ein
   lokaler RLS-Testlauf (`supabase/tests/run.sh`, alle Tests grün). Details:
   [`supabase/README.md`](./supabase/README.md).
+- **Phase 3** — Auth & Onboarding: Registrierung (E-Mail + Passwort) legt über
+  die `onboard_owner`-RPC eine neue Organization an und macht den Nutzer zum
+  owner; Login/Logout; E-Mail-Bestätigungs-Callback. Geschützter App-Bereich
+  (`app/(app)`) mit mobil-tauglichem Header, Navigation und Nutzer-Menü.
+  Team-Verwaltung (`/team`, nur owner/manager): Mitglieder mit Rolle &
+  Stundensatz anlegen/bearbeiten/entfernen, E-Mail-Einladungen mit teilbarem
+  Einladungslink, Annahme über `/einladung/[token]` (`accept_invitation`-RPC).
+  Zahlreiche shadcn/ui-Komponenten ergänzt (Input, Label, Dialog, Select,
+  Dropdown, Avatar, Badge, Toaster …). `onboard_owner` zusätzlich gegen echtes
+  Postgres getestet.
