@@ -117,7 +117,7 @@ strikt pro Organization über **RLS**.
 - [x] **Phase 3** — Auth + Onboarding + Organization + Team-Einladungen
 - [x] **Phase 4** — Properties CRUD + Dashboard mit Status-Ampel
 - [x] **Phase 5** — iCal-Sync + automatische Reinigungsaufgaben
-- [ ] **Phase 6** — Tasks (Zuweisung, Foto-Upload, Status, activity_log)
+- [x] **Phase 6** — Tasks (Zuweisung, Foto-Upload, Status, activity_log)
 - [ ] **Phase 7** — Time-Entries + Kostenauswertung
 - [ ] **Phase 8** — Stripe (Abo + einmalig + Trial + Customer Portal + Webhooks)
 - [ ] **Phase 9** — DSGVO-Seiten + Account-Löschung + Politur
@@ -166,3 +166,12 @@ strikt pro Organization über **RLS**.
   (Bearer-`CRON_SECRET`, Service-Role) für alle Objekte. Parser- und
   Abgleich-Logik mit 8 Unit-Tests (`pnpm test`) abgedeckt; DB-Idempotenz gegen
   echtes Postgres verifiziert.
+- **Phase 6** — Aufgaben (`/aufgaben`): Liste mit Filtern (Objekt, Status,
+  Zuständige:r, Fälligkeit), CRUD für owner/manager, Zuweisung an Teammitglieder.
+  Statuswechsel per Klick (Offen → In Arbeit → Erledigt) setzt completed_at/
+  completed_by; jede Statusänderung landet im `activity_log`. Detailseite mit
+  **Foto-Upload als Nachweis** (Supabase Storage, privater Bucket, signierte
+  URLs) und Galerie. cleaner/maintenance sehen/bearbeiten nur Zugewiesenes und
+  können abhaken & Fotos hochladen. Aktivitäts-Feed („Wer hat was gemacht") auf
+  der Team-Seite. Task- und Foto-RLS (nur zugewiesene Aufgaben beschreibbar)
+  gegen echtes Postgres verifiziert.

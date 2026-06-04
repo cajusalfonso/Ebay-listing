@@ -2,8 +2,10 @@ import { redirect } from "next/navigation";
 
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentUser } from "@/lib/data/profile";
+import { getActivityFeed } from "@/lib/data/activity";
 import { isStaffRole } from "@/lib/types";
 import { publicEnv } from "@/lib/env";
+import { ActivityFeed } from "@/components/activity/activity-feed";
 import { InviteMemberDialog } from "@/components/team/invite-member-dialog";
 import { MemberList, type Member } from "@/components/team/member-list";
 import {
@@ -37,6 +39,8 @@ export default async function TeamPage() {
     .eq("status", "pending")
     .order("created_at", { ascending: false });
 
+  const activity = await getActivityFeed(15);
+
   return (
     <div className="space-y-8">
       <div className="flex flex-wrap items-center justify-between gap-3">
@@ -67,6 +71,13 @@ export default async function TeamPage() {
           invitations={(invitations ?? []) as PendingInvite[]}
           appUrl={publicEnv.NEXT_PUBLIC_APP_URL}
         />
+      </section>
+
+      <section className="space-y-3">
+        <h2 className="text-sm font-semibold text-muted-foreground">
+          Aktivität
+        </h2>
+        <ActivityFeed entries={activity} />
       </section>
     </div>
   );
