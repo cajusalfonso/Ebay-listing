@@ -67,6 +67,7 @@ Das Datenbank-Schema und die RLS-Policies (Migrations) folgen in **Phase 2**.
 | `pnpm build`       | Produktions-Build                      |
 | `pnpm start`       | Produktions-Server                     |
 | `pnpm typecheck`   | TypeScript prüfen (keine Emits)        |
+| `pnpm test`        | Unit-Tests (iCal-Parser & -Abgleich)   |
 | `pnpm lint`        | ESLint                                 |
 | `pnpm format`      | Prettier (schreibend)                  |
 
@@ -115,7 +116,7 @@ strikt pro Organization über **RLS**.
 - [x] **Phase 2** — DB-Schema + RLS-Policies (Migrations) + Seed-Daten
 - [x] **Phase 3** — Auth + Onboarding + Organization + Team-Einladungen
 - [x] **Phase 4** — Properties CRUD + Dashboard mit Status-Ampel
-- [ ] **Phase 5** — iCal-Sync + automatische Reinigungsaufgaben
+- [x] **Phase 5** — iCal-Sync + automatische Reinigungsaufgaben
 - [ ] **Phase 6** — Tasks (Zuweisung, Foto-Upload, Status, activity_log)
 - [ ] **Phase 7** — Time-Entries + Kostenauswertung
 - [ ] **Phase 8** — Stripe (Abo + einmalig + Trial + Customer Portal + Webhooks)
@@ -154,3 +155,14 @@ strikt pro Organization über **RLS**.
   Kennzahlen (offene Aufgaben heute, Check-outs der nächsten 7 Tage,
   Personalkosten des laufenden Monats). Eigene cleaner/maintenance-Ansicht mit
   „Meine offenen Aufgaben". Status-Logik gegen echte Seed-Daten verifiziert.
+- **Phase 5** — iCal-Sync (Kern-Feature): server-seitiger Import der
+  Airbnb-/Booking-Kalender mit `node-ical`. Idempotenter Abgleich über
+  (property_id, external_uid) — keine Duplikate; verschwundene künftige
+  Buchungen werden storniert, geänderte aktualisiert. Für jede neue/aktive
+  Reservierung (kein Block) entsteht automatisch eine Reinigungsaufgabe zum
+  Check-out (DB-seitig per partiellem Unique-Index abgesichert). Manueller
+  „Jetzt synchronisieren"-Button je Objekt + API-Route
+  `POST /api/properties/[id]/sync`; Cron-Endpoint `GET /api/cron/sync`
+  (Bearer-`CRON_SECRET`, Service-Role) für alle Objekte. Parser- und
+  Abgleich-Logik mit 8 Unit-Tests (`pnpm test`) abgedeckt; DB-Idempotenz gegen
+  echtes Postgres verifiziert.

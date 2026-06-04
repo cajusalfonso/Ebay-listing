@@ -21,6 +21,7 @@ import {
   PropertyFormDialog,
   type PropertyFormValues,
 } from "@/components/properties/property-form-dialog";
+import { SyncButton } from "@/components/properties/sync-button";
 
 export function PropertiesManager({
   properties,
@@ -97,6 +98,12 @@ export function PropertiesManager({
                     </span>
                   )}
                 </div>
+
+                {p.ical_url && (
+                  <div className="pt-1">
+                    <SyncButton propertyId={p.id} />
+                  </div>
+                )}
               </CardContent>
             </Card>
           ))}
