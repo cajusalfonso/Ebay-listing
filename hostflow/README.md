@@ -112,7 +112,7 @@ strikt pro Organization über **RLS**.
 ## Roadmap (Phasen)
 
 - [x] **Phase 1** — Projekt-Setup: Next.js + Tailwind + shadcn/ui + Supabase-Clients + Env-Struktur + README
-- [ ] **Phase 2** — DB-Schema + RLS-Policies (Migrations) + Seed-Daten
+- [x] **Phase 2** — DB-Schema + RLS-Policies (Migrations) + Seed-Daten
 - [ ] **Phase 3** — Auth + Onboarding + Organization + Team-Einladungen
 - [ ] **Phase 4** — Properties CRUD + Dashboard mit Status-Ampel
 - [ ] **Phase 5** — iCal-Sync + automatische Reinigungsaufgaben
@@ -127,3 +127,12 @@ strikt pro Organization über **RLS**.
   shadcn/ui-Basis (Button, Card), typsicherer Env-Validierung, drei Supabase-
   Clients (Browser/Server/Middleware) inkl. Routen-Schutz, deutscher Landing-
   Page und Platzhalter-Routen für Auth- und DSGVO-Seiten.
+- **Phase 2** — Komplettes Datenbank-Schema als Supabase-Migrationen
+  (`supabase/migrations/`): alle Tabellen des Datenmodells, Enums, Constraints
+  (u. a. „Stunden ODER Pauschale", idempotenter iCal-Sync via Unique-Index) und
+  Indizes. RLS auf jeder Tabelle mit strikter Mandantentrennung; cleaner/
+  maintenance sehen nur zugewiesene Aufgaben + eigene Stunden. RPCs für
+  Onboarding (`onboard_owner`) und Team-Einladungen (`accept_invitation`),
+  privater Storage-Bucket für Aufgaben-Fotos, Seed mit zwei Tenants und ein
+  lokaler RLS-Testlauf (`supabase/tests/run.sh`, alle Tests grün). Details:
+  [`supabase/README.md`](./supabase/README.md).
