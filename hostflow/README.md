@@ -118,7 +118,7 @@ strikt pro Organization über **RLS**.
 - [x] **Phase 4** — Properties CRUD + Dashboard mit Status-Ampel
 - [x] **Phase 5** — iCal-Sync + automatische Reinigungsaufgaben
 - [x] **Phase 6** — Tasks (Zuweisung, Foto-Upload, Status, activity_log)
-- [ ] **Phase 7** — Time-Entries + Kostenauswertung
+- [x] **Phase 7** — Time-Entries + Kostenauswertung
 - [ ] **Phase 8** — Stripe (Abo + einmalig + Trial + Customer Portal + Webhooks)
 - [ ] **Phase 9** — DSGVO-Seiten + Account-Löschung + Politur
 
@@ -175,3 +175,10 @@ strikt pro Organization über **RLS**.
   können abhaken & Fotos hochladen. Aktivitäts-Feed („Wer hat was gemacht") auf
   der Team-Seite. Task- und Foto-RLS (nur zugewiesene Aufgaben beschreibbar)
   gegen echtes Postgres verifiziert.
+- **Phase 7** — Zeiterfassung (`/zeiten`, alle Rollen): Stunden×Satz ODER
+  Pauschale pro Objekt/Aufgabe; Stundensatz wird beim Erfassen als Snapshot
+  gespeichert. Eigene Einträge mit Löschen. Kostenauswertung (`/kosten`,
+  owner/manager): Monats-/Objektfilter, Summe & Stunden, Balkendiagramm „Kosten
+  pro Objekt" und 6-Monats-Verlauf (recharts) plus Einzelposten. XOR-Constraint
+  (Stunden ODER Pauschale) und Zeit-RLS (nur eigene Einträge) gegen echtes
+  Postgres verifiziert.

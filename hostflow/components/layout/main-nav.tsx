@@ -5,6 +5,8 @@ import { usePathname } from "next/navigation";
 import {
   Building2,
   ClipboardList,
+  Clock,
+  Euro,
   LayoutDashboard,
   Users,
   type LucideIcon,
@@ -23,7 +25,9 @@ type NavItem = {
 const NAV_ITEMS: NavItem[] = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { href: "/aufgaben", label: "Aufgaben", icon: ClipboardList },
+  { href: "/zeiten", label: "Zeiten", icon: Clock },
   { href: "/objekte", label: "Objekte", icon: Building2, staffOnly: true },
+  { href: "/kosten", label: "Kosten", icon: Euro, staffOnly: true },
   { href: "/team", label: "Team", icon: Users, staffOnly: true },
 ];
 
