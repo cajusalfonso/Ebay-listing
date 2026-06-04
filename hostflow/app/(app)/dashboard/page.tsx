@@ -1,19 +1,22 @@
-import Link from "next/link";
-import { ArrowRight, Building2, Users } from "lucide-react";
+import { CalendarClock, ClipboardList, Euro } from "lucide-react";
 
 import { getCurrentUser } from "@/lib/data/profile";
+import { getMyOpenTasks, getStaffDashboard } from "@/lib/data/dashboard";
 import { isStaffRole } from "@/lib/types";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Card, CardContent } from "@/components/ui/card";
+import { StatCard } from "@/components/dashboard/stat-card";
+import {
+  PropertyStatusGrid,
+  StatusLegend,
+} from "@/components/dashboard/property-status-grid";
 
 export const metadata = { title: "Dashboard" };
+
+const euro = new Intl.NumberFormat("de-DE", {
+  style: "currency",
+  currency: "EUR",
+});
 
 function trialDaysLeft(trialEndsAt: string): number {
   const diff = new Date(trialEndsAt).getTime() - Date.now();
@@ -22,12 +25,10 @@ function trialDaysLeft(trialEndsAt: string): number {
 
 export default async function DashboardPage() {
   const current = await getCurrentUser();
-  if (!current) return null; // Layout kümmert sich um Redirects.
+  if (!current) return null;
 
   const { profile, organization } = current;
   const firstName = profile.full_name.split(" ")[0] || "willkommen";
-  const isStaff = isStaffRole(profile.role);
-  const daysLeft = trialDaysLeft(organization.trial_ends_at);
 
   return (
     <div className="space-y-6">
@@ -40,50 +41,97 @@ export default async function DashboardPage() {
         </div>
         {organization.subscription_status === "trialing" && (
           <Badge variant="secondary">
-            Testphase · noch {daysLeft} {daysLeft === 1 ? "Tag" : "Tage"}
+            Testphase · noch {trialDaysLeft(organization.trial_ends_at)} Tage
           </Badge>
         )}
       </div>
 
-      {/* Hinweis: Die Status-Ampel & Kennzahlen folgen in Phase 4. */}
-      <div className="grid gap-4 sm:grid-cols-2">
-        {isStaff && (
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-base">
-                <Users className="h-5 w-5 text-primary" /> Team verwalten
-              </CardTitle>
-              <CardDescription>
-                Lade Reinigungskräfte und Hausmeister ein und lege Rollen &
-                Stundensätze fest.
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <Button asChild variant="outline" size="sm">
-                <Link href="/team">
-                  Zum Team <ArrowRight className="h-4 w-4" />
-                </Link>
-              </Button>
-            </CardContent>
-          </Card>
-        )}
+      {isStaffRole(profile.role) ? (
+        <StaffDashboard organizationId={organization.id} />
+      ) : (
+        <CleanerDashboard />
+      )}
+    </div>
+  );
+}
 
+async function StaffDashboard({ organizationId }: { organizationId: string }) {
+  const { properties, statusCounts, stats } =
+    await getStaffDashboard(organizationId);
+
+  return (
+    <>
+      <div className="grid gap-3 sm:grid-cols-3">
+        <StatCard
+          icon={ClipboardList}
+          label="Offene Aufgaben heute"
+          value={stats.openTasksToday}
+          hint="inkl. überfällig"
+        />
+        <StatCard
+          icon={CalendarClock}
+          label="Check-outs (7 Tage)"
+          value={stats.upcomingCheckouts}
+        />
+        <StatCard
+          icon={Euro}
+          label="Personalkosten (Monat)"
+          value={euro.format(stats.monthlyStaffCost)}
+        />
+      </div>
+
+      <section className="space-y-3">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <h2 className="text-lg font-semibold">Objekte</h2>
+          <StatusLegend counts={statusCounts} />
+        </div>
+        <PropertyStatusGrid properties={properties} />
+      </section>
+    </>
+  );
+}
+
+async function CleanerDashboard() {
+  const tasks = await getMyOpenTasks();
+
+  return (
+    <section className="space-y-3">
+      <h2 className="text-lg font-semibold">Meine offenen Aufgaben</h2>
+      {tasks.length === 0 ? (
         <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-base">
-              <Building2 className="h-5 w-5 text-primary" /> Objekte
-            </CardTitle>
-            <CardDescription>
-              Lege deine Ferienwohnungen an und verbinde Kalender. (Phase 4)
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <Button variant="outline" size="sm" disabled>
-              Bald verfügbar
-            </Button>
+          <CardContent className="py-10 text-center text-muted-foreground">
+            Aktuell sind dir keine offenen Aufgaben zugewiesen. 🎉
           </CardContent>
         </Card>
-      </div>
-    </div>
+      ) : (
+        <ul className="divide-y rounded-lg border">
+          {tasks.map((t) => (
+            <li key={t.id} className="flex items-center gap-3 p-3">
+              <span
+                className="h-8 w-1.5 shrink-0 rounded-full"
+                style={{ backgroundColor: t.property?.color ?? "#94a3b8" }}
+              />
+              <div className="min-w-0 flex-1">
+                <p className="truncate font-medium">{t.title}</p>
+                <p className="truncate text-sm text-muted-foreground">
+                  {t.property?.name ?? "—"}
+                </p>
+              </div>
+              {t.due_date && (
+                <Badge variant="outline" className="shrink-0">
+                  {new Date(t.due_date).toLocaleDateString("de-DE", {
+                    day: "2-digit",
+                    month: "2-digit",
+                  })}
+                </Badge>
+              )}
+            </li>
+          ))}
+        </ul>
+      )}
+      <p className="text-xs text-muted-foreground">
+        Aufgaben abhaken und Fotos hochladen kommt in Kürze.
+      </p>
+    </section>
   );
 }

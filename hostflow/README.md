@@ -114,7 +114,7 @@ strikt pro Organization über **RLS**.
 - [x] **Phase 1** — Projekt-Setup: Next.js + Tailwind + shadcn/ui + Supabase-Clients + Env-Struktur + README
 - [x] **Phase 2** — DB-Schema + RLS-Policies (Migrations) + Seed-Daten
 - [x] **Phase 3** — Auth + Onboarding + Organization + Team-Einladungen
-- [ ] **Phase 4** — Properties CRUD + Dashboard mit Status-Ampel
+- [x] **Phase 4** — Properties CRUD + Dashboard mit Status-Ampel
 - [ ] **Phase 5** — iCal-Sync + automatische Reinigungsaufgaben
 - [ ] **Phase 6** — Tasks (Zuweisung, Foto-Upload, Status, activity_log)
 - [ ] **Phase 7** — Time-Entries + Kostenauswertung
@@ -146,3 +146,11 @@ strikt pro Organization über **RLS**.
   Zahlreiche shadcn/ui-Komponenten ergänzt (Input, Label, Dialog, Select,
   Dropdown, Avatar, Badge, Toaster …). `onboard_owner` zusätzlich gegen echtes
   Postgres getestet.
+- **Phase 4** — Objekte-Verwaltung (`/objekte`, owner/manager): Anlegen,
+  Bearbeiten, Löschen von Ferienwohnungen inkl. Adresse, iCal-Link,
+  Reinigungspauschale, Notizen und Farbe. Dashboard mit **Status-Ampel** je
+  Objekt (Vermietet / Frei / In Reinigung / Blockiert), abgeleitet aus
+  Buchungen + offenen Reinigungsaufgaben (`computePropertyStatus`), plus
+  Kennzahlen (offene Aufgaben heute, Check-outs der nächsten 7 Tage,
+  Personalkosten des laufenden Monats). Eigene cleaner/maintenance-Ansicht mit
+  „Meine offenen Aufgaben". Status-Logik gegen echte Seed-Daten verifiziert.

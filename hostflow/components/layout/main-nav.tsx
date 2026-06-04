@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { LayoutDashboard, Users, type LucideIcon } from "lucide-react";
+import { Building2, LayoutDashboard, Users, type LucideIcon } from "lucide-react";
 
 import { cn } from "@/lib/utils";
 import { isStaffRole, type UserRole } from "@/lib/types";
@@ -16,6 +16,7 @@ type NavItem = {
 
 const NAV_ITEMS: NavItem[] = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
+  { href: "/objekte", label: "Objekte", icon: Building2, staffOnly: true },
   { href: "/team", label: "Team", icon: Users, staffOnly: true },
 ];
 
