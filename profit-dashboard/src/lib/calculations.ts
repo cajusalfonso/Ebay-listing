@@ -4,7 +4,6 @@ export type OrderMargin = {
   revenue: number;
   purchasePriceEur: number;
   paymentFee: number;
-  channelFee: number;
   totalCosts: number;
   marginEur: number;
   marginPercent: number | null;
@@ -14,13 +13,11 @@ export function calcOrderMargin(order: Order): OrderMargin {
   const purchasePriceEur = order.purchase_price * (order.exchange_rate || 1);
   const revenue = order.is_return ? 0 : order.sale_price;
   const paymentFee = order.sale_price * (order.payment_fee_percent / 100);
-  const channelFee = order.sale_price * (order.channel_fee_percent / 100);
 
   const totalCosts =
     purchasePriceEur +
     order.shipping_cost +
     paymentFee +
-    channelFee +
     order.other_costs +
     (order.is_return ? order.return_cost : 0);
 
@@ -31,7 +28,6 @@ export function calcOrderMargin(order: Order): OrderMargin {
     revenue,
     purchasePriceEur,
     paymentFee,
-    channelFee,
     totalCosts,
     marginEur,
     marginPercent,

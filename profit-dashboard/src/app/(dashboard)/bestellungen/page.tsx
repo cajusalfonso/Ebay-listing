@@ -28,7 +28,6 @@ export default async function BestellungenPage() {
       marginThreshold={
         settings?.margin_threshold_percent ?? DEFAULT_MARGIN_THRESHOLD
       }
-      channelFeeDefaults={settings?.channel_fee_defaults ?? {}}
       userId={user!.id}
     />
   );

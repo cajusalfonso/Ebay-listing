@@ -11,7 +11,6 @@ export type Order = {
   exchange_rate: number;
   shipping_cost: number;
   payment_fee_percent: number;
-  channel_fee_percent: number;
   other_costs: number;
   status: string;
   is_return: boolean;
@@ -45,7 +44,6 @@ export type Settings = {
   user_id: string;
   margin_threshold_percent: number;
   vat_rate_percent: number;
-  channel_fee_defaults: Record<string, number>;
   updated_at: string;
 };
 

@@ -36,12 +36,3 @@ export const CURRENCIES = ["EUR", "USD", "GBP", "CNY", "CHF"] as const;
 
 export const DEFAULT_MARGIN_THRESHOLD = 10;
 export const DEFAULT_VAT_RATE = 19;
-
-export const DEFAULT_CHANNEL_FEE_PERCENT: Record<SalesChannel, number> = {
-  Shopify: 2.4,
-  Idealo: 10,
-  Geizhals: 6,
-  "billiger.de": 8,
-  "testsieger.de": 8,
-  Sonstige: 0,
-};

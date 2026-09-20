@@ -22,7 +22,7 @@ type FormState = Omit<
   "id" | "user_id" | "created_at" | "updated_at"
 >;
 
-function emptyForm(defaults: Record<string, number>): FormState {
+function emptyForm(): FormState {
   return {
     order_date: new Date().toISOString().slice(0, 10),
     product_name: "",
@@ -34,7 +34,6 @@ function emptyForm(defaults: Record<string, number>): FormState {
     exchange_rate: 1,
     shipping_cost: 0,
     payment_fee_percent: 0,
-    channel_fee_percent: defaults["Shopify"] ?? 0,
     other_costs: 0,
     status: "bestellt",
     is_return: false,
@@ -45,25 +44,23 @@ function emptyForm(defaults: Record<string, number>): FormState {
 export function OrdersClient({
   initialOrders,
   marginThreshold,
-  channelFeeDefaults,
   userId,
 }: {
   initialOrders: Order[];
   marginThreshold: number;
-  channelFeeDefaults: Record<string, number>;
   userId: string;
 }) {
   const [orders, setOrders] = useState<Order[]>(initialOrders);
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
-  const [form, setForm] = useState<FormState>(emptyForm(channelFeeDefaults));
+  const [form, setForm] = useState<FormState>(emptyForm());
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const supabase = createClient();
 
   function openNewForm() {
-    setForm(emptyForm(channelFeeDefaults));
+    setForm(emptyForm());
     setEditingId(null);
     setShowForm(true);
   }
@@ -77,14 +74,6 @@ export function OrdersClient({
 
   function updateField<K extends keyof FormState>(key: K, value: FormState[K]) {
     setForm((f) => ({ ...f, [key]: value }));
-  }
-
-  function handleChannelChange(channel: string) {
-    setForm((f) => ({
-      ...f,
-      sales_channel: channel,
-      channel_fee_percent: channelFeeDefaults[channel] ?? f.channel_fee_percent,
-    }));
   }
 
   async function handleSave(e: React.FormEvent) {
@@ -232,7 +221,7 @@ export function OrdersClient({
               <select
                 className="input"
                 value={form.sales_channel}
-                onChange={(e) => handleChannelChange(e.target.value)}
+                onChange={(e) => updateField("sales_channel", e.target.value)}
               >
                 {SALES_CHANNELS.map((c) => (
                   <option key={c} value={c}>
@@ -325,21 +314,6 @@ export function OrdersClient({
                 onChange={(e) =>
                   updateField(
                     "payment_fee_percent",
-                    parseFloat(e.target.value) || 0
-                  )
-                }
-              />
-            </div>
-            <div>
-              <label className="label">Kanalgebühr / Provision (%)</label>
-              <input
-                type="number"
-                step="0.01"
-                className="input"
-                value={form.channel_fee_percent}
-                onChange={(e) =>
-                  updateField(
-                    "channel_fee_percent",
                     parseFloat(e.target.value) || 0
                   )
                 }

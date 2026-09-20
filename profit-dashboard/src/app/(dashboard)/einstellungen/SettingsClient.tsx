@@ -2,25 +2,20 @@
 
 import { useState } from "react";
 import { createClient } from "@/lib/supabase/client";
-import { SALES_CHANNELS } from "@/lib/constants";
 
 export function SettingsClient({
   userId,
   initialMarginThreshold,
   initialVatRate,
-  initialChannelFees,
 }: {
   userId: string;
   initialMarginThreshold: number;
   initialVatRate: number;
-  initialChannelFees: Record<string, number>;
 }) {
   const [marginThreshold, setMarginThreshold] = useState(
     initialMarginThreshold
   );
   const [vatRate, setVatRate] = useState(initialVatRate);
-  const [channelFees, setChannelFees] =
-    useState<Record<string, number>>(initialChannelFees);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -37,7 +32,6 @@ export function SettingsClient({
       user_id: userId,
       margin_threshold_percent: marginThreshold,
       vat_rate_percent: vatRate,
-      channel_fee_defaults: channelFees,
       updated_at: new Date().toISOString(),
     });
 
@@ -81,30 +75,11 @@ export function SettingsClient({
           />
         </div>
 
-        <div>
-          <label className="label">
-            Standard-Kanalgebühr je Herkunft (%)
-          </label>
-          <div className="space-y-2">
-            {SALES_CHANNELS.map((channel) => (
-              <div key={channel} className="flex items-center gap-3">
-                <span className="w-32 text-sm text-slate-600">{channel}</span>
-                <input
-                  type="number"
-                  step="0.1"
-                  className="input"
-                  value={channelFees[channel] ?? 0}
-                  onChange={(e) =>
-                    setChannelFees((f) => ({
-                      ...f,
-                      [channel]: parseFloat(e.target.value) || 0,
-                    }))
-                  }
-                />
-              </div>
-            ))}
-          </div>
-        </div>
+        <p className="text-xs text-slate-400">
+          Werbekosten für Idealo, Geizhals & Co. (CPC) trägst du unter
+          „Fixkosten" ein – Kategorie „Werbung", da sie pro Klick statt pro
+          Bestellung anfallen.
+        </p>
 
         {error && <p className="text-sm text-loss">{error}</p>}
         {saved && <p className="text-sm text-profit">Gespeichert.</p>}
