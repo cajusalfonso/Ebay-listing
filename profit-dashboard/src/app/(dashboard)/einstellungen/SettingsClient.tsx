@@ -77,7 +77,7 @@ export function SettingsClient({
 
         <p className="text-xs text-slate-400">
           Werbekosten für Idealo, Geizhals & Co. (CPC) trägst du unter
-          „Fixkosten" ein – Kategorie „Werbung", da sie pro Klick statt pro
+          „Kosten" ein – Kategorie „Werbung", da sie pro Klick statt pro
           Bestellung anfallen.
         </p>
 

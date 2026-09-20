@@ -13,7 +13,7 @@ Recharts · Hosting über Vercel
 - **Bestellungen**: Erfassung mit automatischer Margen-Berechnung (€ und %),
   Retouren-Handling, rote Warnung unter einstellbarem Margen-Schwellwert,
   Auswertung nach Verkaufskanal und Lieferant, Excel-/PDF-Export
-- **Fixkosten**: einmalig/monatlich, automatische Hochrechnung auf gewählten
+- **Kosten**: beliebige Kosten (einmalig/monatlich), automatische Hochrechnung auf gewählten
   Zeitraum
 - **Kontoauszug**: CSV-Import aus dem Online-Banking mit automatischer
   Spalten-Erkennung (Datum/Betrag/Verwendungszweck), manuell korrigierbare
@@ -93,7 +93,7 @@ automatisch neu.
   Kurs-Abruf).
 - Die Monats-Prognose im Dashboard ist eine einfache lineare Hochrechnung
   (bisheriger Gewinn im Monat ÷ vergangene Tage × Tage im Monat).
-- Die Gewinn-Chart über die Monate basiert auf den Bestellungen; Fixkosten und
+- Die Gewinn-Chart über die Monate basiert auf den Bestellungen; Kosten und
   Kontoauszug fließen nur in die aggregierten Gesamtkennzahlen (Übersicht-KPIs),
   nicht in den Monatsverlauf, ein.
 

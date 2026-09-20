@@ -107,7 +107,7 @@ export function FixedCostsClient({
   }
 
   async function handleDelete(id: string) {
-    if (!confirm("Fixkosten-Eintrag wirklich löschen?")) return;
+    if (!confirm("Kosten-Eintrag wirklich löschen?")) return;
     const { error } = await supabase.from("fixed_costs").delete().eq("id", id);
     if (error) return alert(error.message);
     setItems((prev) => prev.filter((i) => i.id !== id));
@@ -116,9 +116,9 @@ export function FixedCostsClient({
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <h1 className="text-xl font-bold">Fixkosten</h1>
+        <h1 className="text-xl font-bold">Kosten</h1>
         <button onClick={openNewForm} className="btn-primary">
-          + Neue Fixkosten
+          + Neue Kosten
         </button>
       </div>
 
@@ -134,7 +134,7 @@ export function FixedCostsClient({
       />
 
       <div className="card inline-block">
-        <p className="text-sm text-slate-500">Fixkosten im gewählten Zeitraum</p>
+        <p className="text-sm text-slate-500 dark:text-slate-400">Kosten im gewählten Zeitraum</p>
         <p className="text-2xl font-bold">{formatEur(periodTotal)}</p>
       </div>
 
@@ -259,7 +259,7 @@ export function FixedCostsClient({
             {items.length === 0 && (
               <tr>
                 <td colSpan={6} className="py-6 text-center text-slate-400">
-                  Noch keine Fixkosten erfasst.
+                  Noch keine Kosten erfasst.
                 </td>
               </tr>
             )}

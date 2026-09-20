@@ -412,7 +412,10 @@ export function OrdersClient({
               const m = calcOrderMargin(o);
               const warn = isBelowThreshold(m, marginThreshold);
               return (
-                <tr key={o.id} className={warn ? "bg-loss-light" : undefined}>
+                <tr
+                  key={o.id}
+                  className={warn ? "bg-loss-light dark:bg-red-950/40" : undefined}
+                >
                   <td>{o.order_date}</td>
                   <td>{o.product_name}</td>
                   <td>{o.sales_channel}</td>
@@ -420,7 +423,7 @@ export function OrdersClient({
                   <td>
                     {o.status}
                     {o.is_return && (
-                      <span className="ml-1 rounded bg-loss-light px-1.5 py-0.5 text-xs text-loss">
+                      <span className="ml-1 rounded bg-loss-light px-1.5 py-0.5 text-xs text-loss dark:bg-red-950/40">
                         Retoure
                       </span>
                     )}

@@ -192,9 +192,9 @@ export function DashboardClient({
           <div className="h-72">
             <ResponsiveContainer width="100%" height="100%">
               <LineChart data={monthlyProfit}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
-                <XAxis dataKey="month" tick={{ fontSize: 12 }} />
-                <YAxis tick={{ fontSize: 12 }} />
+                <CartesianGrid strokeDasharray="3 3" stroke="#94a3b8" strokeOpacity={0.25} />
+                <XAxis dataKey="month" tick={{ fontSize: 12, fill: "#94a3b8" }} />
+                <YAxis tick={{ fontSize: 12, fill: "#94a3b8" }} />
                 <Tooltip formatter={(v: number) => formatEur(v)} />
                 <Line
                   type="monotone"
@@ -214,9 +214,9 @@ export function DashboardClient({
           <div className="h-72">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={byChannel.map((c) => ({ name: c.key, ...c }))}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
-                <XAxis dataKey="name" tick={{ fontSize: 12 }} />
-                <YAxis tick={{ fontSize: 12 }} />
+                <CartesianGrid strokeDasharray="3 3" stroke="#94a3b8" strokeOpacity={0.25} />
+                <XAxis dataKey="name" tick={{ fontSize: 12, fill: "#94a3b8" }} />
+                <YAxis tick={{ fontSize: 12, fill: "#94a3b8" }} />
                 <Tooltip formatter={(v: number) => formatEur(v)} />
                 <Legend />
                 <Bar dataKey="revenue" fill={CHART_COLORS[0]} name="Umsatz" />

@@ -4,11 +4,12 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useState } from "react";
 import { createClient } from "@/lib/supabase/client";
+import { ThemeToggle } from "@/components/ThemeToggle";
 
 const NAV_ITEMS = [
   { href: "/uebersicht", label: "Übersicht", icon: "📊" },
   { href: "/bestellungen", label: "Bestellungen", icon: "🛒" },
-  { href: "/fixkosten", label: "Fixkosten", icon: "💶" },
+  { href: "/kosten", label: "Kosten", icon: "💶" },
   { href: "/kontoauszug", label: "Kontoauszug", icon: "🏦" },
   { href: "/einstellungen", label: "Einstellungen", icon: "⚙️" },
 ];
@@ -27,24 +28,34 @@ export function Sidebar({ userEmail }: { userEmail: string | null }) {
 
   return (
     <>
-      <div className="flex items-center justify-between border-b border-slate-200 bg-white px-4 py-3 lg:hidden">
-        <span className="font-bold text-brand-dark">Lumox.store</span>
-        <button
-          className="btn-secondary px-3 py-1"
-          onClick={() => setOpen((v) => !v)}
-        >
-          Menü
-        </button>
+      <div className="flex items-center justify-between border-b border-slate-200 bg-white px-4 py-3 dark:border-slate-700 dark:bg-slate-800 lg:hidden">
+        <span className="font-bold text-brand-dark dark:text-brand">Lumox.store</span>
+        <div className="flex items-center gap-2">
+          <ThemeToggle />
+          <button
+            className="btn-secondary px-3 py-1"
+            onClick={() => setOpen((v) => !v)}
+          >
+            Menü
+          </button>
+        </div>
       </div>
 
       <aside
         className={`${
           open ? "block" : "hidden"
-        } w-full border-b border-slate-200 bg-white lg:block lg:w-64 lg:min-h-screen lg:border-b-0 lg:border-r`}
+        } w-full border-b border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-800 lg:block lg:w-64 lg:min-h-screen lg:border-b-0 lg:border-r`}
       >
-        <div className="hidden px-6 py-6 lg:block">
-          <h1 className="text-lg font-bold text-brand-dark">Lumox.store</h1>
-          <p className="text-xs text-slate-500">Gewinn-Übersicht</p>
+        <div className="hidden items-center justify-between px-6 py-6 lg:flex">
+          <div>
+            <h1 className="text-lg font-bold text-brand-dark dark:text-brand">
+              Lumox.store
+            </h1>
+            <p className="text-xs text-slate-500 dark:text-slate-400">
+              Gewinn-Übersicht
+            </p>
+          </div>
+          <ThemeToggle />
         </div>
 
         <nav className="space-y-1 px-3 py-3">
@@ -57,8 +68,8 @@ export function Sidebar({ userEmail }: { userEmail: string | null }) {
                 onClick={() => setOpen(false)}
                 className={`flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium transition ${
                   active
-                    ? "bg-brand/10 text-brand-dark"
-                    : "text-slate-600 hover:bg-slate-100"
+                    ? "bg-brand/10 text-brand-dark dark:bg-brand/20 dark:text-brand"
+                    : "text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-700"
                 }`}
               >
                 <span>{item.icon}</span>
@@ -68,9 +79,9 @@ export function Sidebar({ userEmail }: { userEmail: string | null }) {
           })}
         </nav>
 
-        <div className="border-t border-slate-200 px-3 py-3">
+        <div className="border-t border-slate-200 px-3 py-3 dark:border-slate-700">
           {userEmail && (
-            <p className="mb-2 truncate px-3 text-xs text-slate-400">
+            <p className="mb-2 truncate px-3 text-xs text-slate-400 dark:text-slate-500">
               {userEmail}
             </p>
           )}
