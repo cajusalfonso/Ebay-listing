@@ -83,7 +83,7 @@ export function SettingsClient({
 
         <div>
           <label className="label">
-            Standard-Kanalgebühr je Verkaufskanal (%)
+            Standard-Kanalgebühr je Herkunft (%)
           </label>
           <div className="space-y-2">
             {SALES_CHANNELS.map((channel) => (

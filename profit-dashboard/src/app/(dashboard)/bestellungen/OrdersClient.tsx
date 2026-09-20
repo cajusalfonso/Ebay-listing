@@ -228,7 +228,7 @@ export function OrdersClient({
               />
             </div>
             <div>
-              <label className="label">Verkaufskanal</label>
+              <label className="label">Herkunft / Marketing-Kanal</label>
               <select
                 className="input"
                 value={form.sales_channel}
@@ -505,7 +505,7 @@ export function OrdersClient({
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
         <div className="card">
-          <h2 className="mb-3 font-semibold">Marge nach Verkaufskanal</h2>
+          <h2 className="mb-3 font-semibold">Marge nach Herkunft</h2>
           <table className="data-table">
             <thead>
               <tr>
