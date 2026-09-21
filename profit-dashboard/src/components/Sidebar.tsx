@@ -10,6 +10,7 @@ const NAV_ITEMS = [
   { href: "/uebersicht", label: "Übersicht", icon: "📊" },
   { href: "/bestellungen", label: "Bestellungen", icon: "🛒" },
   { href: "/kosten", label: "Kosten", icon: "💶" },
+  { href: "/schulden", label: "Schulden", icon: "📉" },
   { href: "/kontoauszug", label: "Kontoauszug", icon: "🏦" },
   { href: "/einstellungen", label: "Einstellungen", icon: "⚙️" },
 ];

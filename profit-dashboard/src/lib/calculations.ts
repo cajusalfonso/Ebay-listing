@@ -1,4 +1,10 @@
-import type { Order, FixedCost, BankTransaction } from "@/lib/database.types";
+import type {
+  Order,
+  FixedCost,
+  BankTransaction,
+  Debt,
+  DebtPayment,
+} from "@/lib/database.types";
 
 export type OrderMargin = {
   revenue: number;
@@ -215,6 +221,94 @@ export function profitByMonth(
       profit: v.revenue - v.costs,
       revenue: v.revenue,
     }));
+}
+
+export type OwnerDashboardKpis = {
+  nettoumsatz: number;
+  bestellungen: number;
+  durchschnittVerkaufspreis: number | null;
+  rohertrag: number;
+  rohertragsmargePercent: number | null;
+  marketingkosten: number;
+  cacJeBestellung: number | null;
+  retourenquotePercent: number | null;
+  deckungsbeitrag: number;
+  overhead: number;
+  nettoergebnis: number;
+};
+
+/** KPI-Set fuer das Owner-Dashboard (Nettoumsatz, Rohertrag, CAC, Deckungsbeitrag, ...). */
+export function calcOwnerDashboardKpis(
+  orders: Order[],
+  fixedCosts: FixedCost[],
+  from: Date,
+  to: Date
+): OwnerDashboardKpis {
+  const periodOrders = filterOrdersByPeriod(orders, from, to);
+  const bestellungen = periodOrders.length;
+
+  let nettoumsatz = 0;
+  let rohertrag = 0;
+  let retournen = 0;
+
+  for (const o of periodOrders) {
+    const m = calcOrderMargin(o);
+    nettoumsatz += m.revenue;
+    rohertrag += m.revenue - m.purchasePriceEur;
+    if (o.is_return || o.status === "retourniert") retournen += 1;
+  }
+
+  const orderTotals = summarizeOrders(periodOrders);
+
+  const marketingkosten = fixedCostsForPeriod(
+    fixedCosts.filter((fc) => fc.category === "Werbung"),
+    from,
+    to
+  );
+  const overhead = fixedCostsForPeriod(
+    fixedCosts.filter((fc) => fc.category !== "Werbung"),
+    from,
+    to
+  );
+
+  const deckungsbeitrag = orderTotals.profit - marketingkosten;
+  const nettoergebnis = deckungsbeitrag - overhead;
+
+  return {
+    nettoumsatz,
+    bestellungen,
+    durchschnittVerkaufspreis:
+      bestellungen > 0 ? nettoumsatz / bestellungen : null,
+    rohertrag,
+    rohertragsmargePercent:
+      nettoumsatz !== 0 ? (rohertrag / nettoumsatz) * 100 : null,
+    marketingkosten,
+    cacJeBestellung: bestellungen > 0 ? marketingkosten / bestellungen : null,
+    retourenquotePercent:
+      bestellungen > 0 ? (retournen / bestellungen) * 100 : null,
+    deckungsbeitrag,
+    overhead,
+    nettoergebnis,
+  };
+}
+
+export function debtPaidAmount(debtId: string, payments: DebtPayment[]): number {
+  return payments
+    .filter((p) => p.debt_id === debtId)
+    .reduce((sum, p) => sum + p.amount, 0);
+}
+
+export function debtRemaining(debt: Debt, payments: DebtPayment[]): number {
+  return debt.total_amount - debtPaidAmount(debt.id, payments);
+}
+
+export function summarizeDebts(
+  debts: Debt[],
+  payments: DebtPayment[]
+): { totalDebt: number; totalPaid: number; totalRemaining: number } {
+  const totalDebt = debts.reduce((sum, d) => sum + d.total_amount, 0);
+  const totalPaid = payments.reduce((sum, p) => sum + p.amount, 0);
+  return { totalDebt, totalPaid, totalRemaining: totalDebt - totalPaid };
 }
 
 export function formatEur(value: number): string {

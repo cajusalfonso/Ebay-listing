@@ -20,8 +20,13 @@ Recharts · Hosting über Vercel
   Einnahme/Ausgabe-Zuordnung
 - **Übersicht (Dashboard)**: Zeitraum-Auswahl, Gesamtumsatz/-kosten/-gewinn,
   automatische USt-Rücklagen-Anzeige (Satz einstellbar), Gewinn-Chart über die
-  Monate, Umsatz/Gewinn pro Kanal, einfache Monats-Prognose, Excel-/PDF-Export
-- **Einstellungen**: Margen-Schwellwert, USt-Satz, Standard-Kanalgebühren
+  Monate, Umsatz/Gewinn pro Kanal, einfache Monats-Prognose, Owner-Dashboard-
+  Kennzahlentabelle (Nettoumsatz, Rohertrag, CAC, Deckungsbeitrag, Overhead,
+  Nettoergebnis – aktueller Monat vs. Vormonat), Excel-/PDF-Export sowie ein
+  Gesamtexport-Button für alle Daten in einer XLSX-Datei
+- **Schulden**: Schulden anlegen, Abzahlungen erfassen, Restbetrag und
+  Fortschritt je Schuld
+- **Einstellungen**: Margen-Schwellwert, USt-Satz
 
 ## 1. Lokal zum Laufen bringen
 
@@ -45,10 +50,13 @@ Typecheck: `npm run typecheck` · Produktions-Build lokal testen: `npm run build
 1. Kostenlosen Account auf [supabase.com](https://supabase.com) anlegen und ein
    neues Projekt erstellen (Region z.B. Frankfurt).
 2. **Datenbank-Schema anlegen**: Im Supabase-Dashboard → *SQL Editor* → *New
-   query* → Inhalt von [`supabase/migrations/0001_init.sql`](supabase/migrations/0001_init.sql)
-   einfügen und ausführen. Das legt die Tabellen `orders`, `fixed_costs`,
-   `bank_transactions`, `settings` inkl. Row-Level-Security an (jeder Nutzer
-   sieht ausschließlich seine eigenen Zeilen).
+   query* → nacheinander den Inhalt der Dateien im Ordner
+   [`supabase/migrations/`](supabase/migrations/) einfügen und ausführen, in
+   dieser Reihenfolge: `0001_init.sql`, `0002_remove_channel_fee.sql`,
+   `0003_debts.sql`. Das legt alle Tabellen (`orders`, `fixed_costs`,
+   `bank_transactions`, `settings`, `debts`, `debt_payments`) inkl.
+   Row-Level-Security an (jeder Nutzer sieht ausschließlich seine eigenen
+   Zeilen).
 3. **API-Keys holen**: Dashboard → *Project Settings* → *API*. Dort:
    - `Project URL` → `NEXT_PUBLIC_SUPABASE_URL`
    - `anon public` Key → `NEXT_PUBLIC_SUPABASE_ANON_KEY`

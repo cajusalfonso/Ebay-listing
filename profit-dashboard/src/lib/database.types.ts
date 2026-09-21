@@ -47,6 +47,25 @@ export type Settings = {
   updated_at: string;
 };
 
+export type Debt = {
+  id: string;
+  user_id: string;
+  label: string;
+  total_amount: number;
+  notes: string;
+  created_at: string;
+};
+
+export type DebtPayment = {
+  id: string;
+  user_id: string;
+  debt_id: string;
+  payment_date: string;
+  amount: number;
+  note: string;
+  created_at: string;
+};
+
 export type Database = {
   public: {
     Tables: {
@@ -72,6 +91,18 @@ export type Database = {
         Row: Settings;
         Insert: Partial<Settings> & { user_id: string };
         Update: Partial<Settings>;
+        Relationships: [];
+      };
+      debts: {
+        Row: Debt;
+        Insert: Partial<Debt> & { user_id: string };
+        Update: Partial<Debt>;
+        Relationships: [];
+      };
+      debt_payments: {
+        Row: DebtPayment;
+        Insert: Partial<DebtPayment> & { user_id: string; debt_id: string };
+        Update: Partial<DebtPayment>;
         Relationships: [];
       };
     };
