@@ -2,11 +2,18 @@
 
 import { useMemo, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
-import type { Supplier, ProductModel } from "@/lib/database.types";
+import type {
+  Supplier,
+  ProductModel,
+  ModelCategory,
+  ModelCategoryLink,
+  ModelSpec,
+} from "@/lib/database.types";
 import { SUPPLIER_PLATFORMS } from "@/lib/constants";
 import {
   calcModelMargin,
-  cheapestModelIdsByVariant,
+  calcPriceComparison,
+  groupModelsByName,
   formatEur,
   formatPercent,
 } from "@/lib/calculations";
@@ -39,6 +46,7 @@ function emptyModelForm(supplierId: string): ModelForm {
     sale_price_gross: 0,
     purchase_date: new Date().toISOString().slice(0, 10),
     notes: "",
+    spec: "EU",
   };
 }
 
@@ -47,16 +55,23 @@ type SortField = "model" | "purchase_price_net" | "sale_price_gross" | "margin" 
 export function SupplierClient({
   initialSuppliers,
   initialModels,
+  initialCategories,
+  initialCategoryLinks,
   paymentFeePercent,
   userId,
 }: {
   initialSuppliers: Supplier[];
   initialModels: ProductModel[];
+  initialCategories: ModelCategory[];
+  initialCategoryLinks: ModelCategoryLink[];
   paymentFeePercent: number;
   userId: string;
 }) {
   const [suppliers, setSuppliers] = useState<Supplier[]>(initialSuppliers);
   const [models, setModels] = useState<ProductModel[]>(initialModels);
+  const [categories, setCategories] = useState<ModelCategory[]>(initialCategories);
+  const [categoryLinks, setCategoryLinks] =
+    useState<ModelCategoryLink[]>(initialCategoryLinks);
 
   const [showSupplierForm, setShowSupplierForm] = useState(false);
   const [editingSupplierId, setEditingSupplierId] = useState<string | null>(null);
@@ -67,11 +82,20 @@ export function SupplierClient({
   const [modelForm, setModelForm] = useState<ModelForm>(
     emptyModelForm(initialSuppliers[0]?.id ?? "")
   );
+  const [modelFormCategoryIds, setModelFormCategoryIds] = useState<string[]>([]);
 
   const [selectedSupplierId, setSelectedSupplierId] = useState<string | null>(null);
   const [searchModel, setSearchModel] = useState("");
+  const [specFilter, setSpecFilter] = useState<"all" | ModelSpec>("all");
+  const [categoryFilterId, setCategoryFilterId] = useState<string | null>(null);
   const [sortField, setSortField] = useState<SortField>("model");
   const [sortDir, setSortDir] = useState<"asc" | "desc">("asc");
+  const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set());
+
+  const [showCategoryManager, setShowCategoryManager] = useState(false);
+  const [newCategoryName, setNewCategoryName] = useState("");
+  const [editingCategoryId, setEditingCategoryId] = useState<string | null>(null);
+  const [editingCategoryName, setEditingCategoryName] = useState("");
 
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -90,7 +114,17 @@ export function SupplierClient({
     return map;
   }, [models]);
 
-  const cheapestIds = useMemo(() => cheapestModelIdsByVariant(models), [models]);
+  const categoryIdsByModel = useMemo(() => {
+    const map = new Map<string, string[]>();
+    categoryLinks.forEach((l) => {
+      const list = map.get(l.model_id) ?? [];
+      list.push(l.category_id);
+      map.set(l.model_id, list);
+    });
+    return map;
+  }, [categoryLinks]);
+
+  const priceComparison = useMemo(() => calcPriceComparison(models), [models]);
 
   // --- Supplier CRUD ---
 
@@ -156,6 +190,7 @@ export function SupplierClient({
 
   function openNewModelForm(supplierId?: string) {
     setModelForm(emptyModelForm(supplierId ?? selectedSupplierId ?? suppliers[0]?.id ?? ""));
+    setModelFormCategoryIds([]);
     setEditingModelId(null);
     setShowModelForm(true);
   }
@@ -163,14 +198,52 @@ export function SupplierClient({
   function openEditModelForm(m: ProductModel) {
     const { id, user_id, created_at, ...rest } = m;
     setModelForm(rest);
+    setModelFormCategoryIds(categoryIdsByModel.get(m.id) ?? []);
     setEditingModelId(m.id);
     setShowModelForm(true);
+  }
+
+  function toggleModelFormCategory(categoryId: string) {
+    setModelFormCategoryIds((prev) =>
+      prev.includes(categoryId)
+        ? prev.filter((id) => id !== categoryId)
+        : [...prev, categoryId]
+    );
+  }
+
+  async function syncModelCategories(modelId: string) {
+    await supabase.from("model_category_links").delete().eq("model_id", modelId);
+
+    if (modelFormCategoryIds.length === 0) {
+      setCategoryLinks((prev) => prev.filter((l) => l.model_id !== modelId));
+      return;
+    }
+
+    const { data, error } = await supabase
+      .from("model_category_links")
+      .insert(
+        modelFormCategoryIds.map((categoryId) => ({
+          model_id: modelId,
+          category_id: categoryId,
+          user_id: userId,
+        }))
+      )
+      .select();
+
+    if (error) {
+      setError(error.message);
+      return;
+    }
+
+    setCategoryLinks((prev) => [...prev.filter((l) => l.model_id !== modelId), ...(data ?? [])]);
   }
 
   async function handleSaveModel(e: React.FormEvent) {
     e.preventDefault();
     setSaving(true);
     setError(null);
+
+    let savedModelId: string | null = null;
 
     if (editingModelId) {
       const { data, error } = await supabase
@@ -179,20 +252,29 @@ export function SupplierClient({
         .eq("id", editingModelId)
         .select()
         .single();
-      setSaving(false);
-      if (error) return setError(error.message);
+      if (error) {
+        setSaving(false);
+        return setError(error.message);
+      }
       setModels((prev) => prev.map((m) => (m.id === editingModelId ? data : m)));
+      savedModelId = editingModelId;
     } else {
       const { data, error } = await supabase
         .from("product_models")
         .insert({ ...modelForm, user_id: userId })
         .select()
         .single();
-      setSaving(false);
-      if (error) return setError(error.message);
+      if (error) {
+        setSaving(false);
+        return setError(error.message);
+      }
       setModels((prev) => [data, ...prev]);
+      savedModelId = data.id;
     }
 
+    if (savedModelId) await syncModelCategories(savedModelId);
+
+    setSaving(false);
     setShowModelForm(false);
     setEditingModelId(null);
   }
@@ -202,9 +284,63 @@ export function SupplierClient({
     const { error } = await supabase.from("product_models").delete().eq("id", id);
     if (error) return alert(error.message);
     setModels((prev) => prev.filter((m) => m.id !== id));
+    setCategoryLinks((prev) => prev.filter((l) => l.model_id !== id));
   }
 
-  // --- Filter + Sort ---
+  // --- Kategorien-Verwaltung ---
+
+  async function handleAddCategory(e: React.FormEvent) {
+    e.preventDefault();
+    if (!newCategoryName.trim()) return;
+    const { data, error } = await supabase
+      .from("model_categories")
+      .insert({ name: newCategoryName.trim(), user_id: userId })
+      .select()
+      .single();
+    if (error) return setError(error.message);
+    setCategories((prev) => [...prev, data].sort((a, b) => a.name.localeCompare(b.name)));
+    setNewCategoryName("");
+  }
+
+  function startRenameCategory(c: ModelCategory) {
+    setEditingCategoryId(c.id);
+    setEditingCategoryName(c.name);
+  }
+
+  async function handleRenameCategory(e: React.FormEvent) {
+    e.preventDefault();
+    if (!editingCategoryId || !editingCategoryName.trim()) return;
+    const { data, error } = await supabase
+      .from("model_categories")
+      .update({ name: editingCategoryName.trim() })
+      .eq("id", editingCategoryId)
+      .select()
+      .single();
+    if (error) return setError(error.message);
+    setCategories((prev) =>
+      prev
+        .map((c) => (c.id === editingCategoryId ? data : c))
+        .sort((a, b) => a.name.localeCompare(b.name))
+    );
+    setEditingCategoryId(null);
+    setEditingCategoryName("");
+  }
+
+  async function handleDeleteCategory(id: string) {
+    if (
+      !confirm(
+        "Kategorie wirklich löschen? Die Zuordnung bei den Modellen wird entfernt, die Modelle selbst bleiben erhalten."
+      )
+    )
+      return;
+    const { error } = await supabase.from("model_categories").delete().eq("id", id);
+    if (error) return alert(error.message);
+    setCategories((prev) => prev.filter((c) => c.id !== id));
+    setCategoryLinks((prev) => prev.filter((l) => l.category_id !== id));
+    if (categoryFilterId === id) setCategoryFilterId(null);
+  }
+
+  // --- Filter + Sort + Gruppierung ---
 
   function toggleSort(field: SortField) {
     if (sortField === field) {
@@ -215,18 +351,32 @@ export function SupplierClient({
     }
   }
 
+  function toggleGroupCollapsed(name: string) {
+    setCollapsedGroups((prev) => {
+      const next = new Set(prev);
+      if (next.has(name)) next.delete(name);
+      else next.add(name);
+      return next;
+    });
+  }
+
   const filteredModels = useMemo(() => {
     return models.filter((m) => {
       if (selectedSupplierId && m.supplier_id !== selectedSupplierId) return false;
       if (searchModel && !m.model.toLowerCase().includes(searchModel.toLowerCase()))
         return false;
+      if (specFilter !== "all" && m.spec !== specFilter) return false;
+      if (categoryFilterId) {
+        const ids = categoryIdsByModel.get(m.id) ?? [];
+        if (!ids.includes(categoryFilterId)) return false;
+      }
       return true;
     });
-  }, [models, selectedSupplierId, searchModel]);
+  }, [models, selectedSupplierId, searchModel, specFilter, categoryFilterId, categoryIdsByModel]);
 
-  const sortedModels = useMemo(() => {
+  function sortModels(list: ProductModel[]): ProductModel[] {
     const dir = sortDir === "asc" ? 1 : -1;
-    return [...filteredModels].sort((a, b) => {
+    return [...list].sort((a, b) => {
       if (sortField === "model") return a.model.localeCompare(b.model) * dir;
       if (sortField === "purchase_price_net")
         return (a.purchase_price_net - b.purchase_price_net) * dir;
@@ -237,11 +387,18 @@ export function SupplierClient({
         const nameB = supplierById.get(b.supplier_id)?.company_name ?? "";
         return nameA.localeCompare(nameB) * dir;
       }
-      // margin
       const marginA = calcModelMargin(a, paymentFeePercent).marginEur;
       const marginB = calcModelMargin(b, paymentFeePercent).marginEur;
       return (marginA - marginB) * dir;
     });
+  }
+
+  const groupedModels = useMemo(() => {
+    const groups = groupModelsByName(filteredModels);
+    const sortedGroups =
+      sortField === "model" && sortDir === "desc" ? [...groups].reverse() : groups;
+    return sortedGroups.map((g) => ({ ...g, items: sortModels(g.items) }));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [filteredModels, sortField, sortDir, supplierById, paymentFeePercent]);
 
   const selectedSupplier = selectedSupplierId ? supplierById.get(selectedSupplierId) : null;
@@ -255,7 +412,10 @@ export function SupplierClient({
     <div className="space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h1 className="text-xl font-bold">Supplier &amp; Modelle</h1>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
+          <button onClick={() => setShowCategoryManager((v) => !v)} className="btn-secondary">
+            🏷️ Kategorien
+          </button>
           <button onClick={openNewSupplierForm} className="btn-secondary">
             + Neuer Supplier
           </button>
@@ -266,6 +426,73 @@ export function SupplierClient({
       </div>
 
       {error && <p className="text-sm text-loss">{error}</p>}
+
+      {/* Kategorien-Verwaltung */}
+      {showCategoryManager && (
+        <div className="card">
+          <h2 className="mb-3 font-semibold">Kategorien verwalten</h2>
+          <form onSubmit={handleAddCategory} className="mb-4 flex flex-wrap gap-2">
+            <input
+              className="input w-64"
+              placeholder="Neue Kategorie, z.B. Topseller"
+              value={newCategoryName}
+              onChange={(e) => setNewCategoryName(e.target.value)}
+            />
+            <button type="submit" className="btn-primary">
+              Hinzufügen
+            </button>
+          </form>
+
+          {categories.length === 0 && (
+            <p className="text-sm text-slate-400">Noch keine Kategorien angelegt.</p>
+          )}
+
+          <ul className="space-y-2">
+            {categories.map((c) => (
+              <li key={c.id} className="flex items-center justify-between gap-2 text-sm">
+                {editingCategoryId === c.id ? (
+                  <form onSubmit={handleRenameCategory} className="flex flex-1 gap-2">
+                    <input
+                      className="input"
+                      value={editingCategoryName}
+                      onChange={(e) => setEditingCategoryName(e.target.value)}
+                      autoFocus
+                    />
+                    <button type="submit" className="btn-primary px-3 py-1">
+                      Speichern
+                    </button>
+                    <button
+                      type="button"
+                      className="btn-secondary px-3 py-1"
+                      onClick={() => setEditingCategoryId(null)}
+                    >
+                      Abbrechen
+                    </button>
+                  </form>
+                ) : (
+                  <>
+                    <span>{c.name}</span>
+                    <div className="flex gap-3">
+                      <button
+                        className="text-brand hover:underline"
+                        onClick={() => startRenameCategory(c)}
+                      >
+                        Umbenennen
+                      </button>
+                      <button
+                        className="text-loss hover:underline"
+                        onClick={() => handleDeleteCategory(c.id)}
+                      >
+                        Löschen
+                      </button>
+                    </div>
+                  </>
+                )}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
 
       {/* Supplier-Formular */}
       {showSupplierForm && (
@@ -441,6 +668,20 @@ export function SupplierClient({
               />
             </div>
             <div>
+              <label className="label">Spec</label>
+              <select
+                required
+                className="input"
+                value={modelForm.spec}
+                onChange={(e) =>
+                  setModelForm((f) => ({ ...f, spec: e.target.value as ModelSpec }))
+                }
+              >
+                <option value="EU">EU</option>
+                <option value="US">US</option>
+              </select>
+            </div>
+            <div>
               <label className="label">EK netto (€)</label>
               <input
                 type="number"
@@ -489,6 +730,24 @@ export function SupplierClient({
                 onChange={(e) => setModelForm((f) => ({ ...f, notes: e.target.value }))}
               />
             </div>
+
+            {categories.length > 0 && (
+              <div className="sm:col-span-2 lg:col-span-4">
+                <label className="label">Kategorien</label>
+                <div className="flex flex-wrap gap-3">
+                  {categories.map((c) => (
+                    <label key={c.id} className="flex items-center gap-1.5 text-sm">
+                      <input
+                        type="checkbox"
+                        checked={modelFormCategoryIds.includes(c.id)}
+                        onChange={() => toggleModelFormCategory(c.id)}
+                      />
+                      {c.name}
+                    </label>
+                  ))}
+                </div>
+              </div>
+            )}
 
             {suppliers.length === 0 && (
               <p className="col-span-full text-sm text-loss">
@@ -632,7 +891,7 @@ export function SupplierClient({
         </div>
       )}
 
-      {/* Modelle-Tabelle */}
+      {/* Modelle */}
       <div className="card overflow-x-auto">
         <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
           <h2 className="font-semibold">Modelle</h2>
@@ -655,105 +914,185 @@ export function SupplierClient({
                 </option>
               ))}
             </select>
+            <select
+              className="input w-32"
+              value={specFilter}
+              onChange={(e) => setSpecFilter(e.target.value as "all" | ModelSpec)}
+            >
+              <option value="all">Alle Specs</option>
+              <option value="EU">EU</option>
+              <option value="US">US</option>
+            </select>
+            {categories.length > 0 && (
+              <select
+                className="input w-48"
+                value={categoryFilterId ?? ""}
+                onChange={(e) => setCategoryFilterId(e.target.value || null)}
+              >
+                <option value="">Alle Kategorien</option>
+                {categories.map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.name}
+                  </option>
+                ))}
+              </select>
+            )}
           </div>
         </div>
 
-        <table className="data-table">
-          <thead>
-            <tr>
-              <th className="cursor-pointer select-none" onClick={() => toggleSort("model")}>
-                Modell{sortIndicator("model")}
-              </th>
-              <th>Speicher</th>
-              <th>Farbe</th>
-              <th
-                className="cursor-pointer select-none"
-                onClick={() => toggleSort("purchase_price_net")}
+        <div className="mb-2 flex gap-4 text-xs text-slate-400">
+          <button onClick={() => toggleSort("model")} className="hover:underline">
+            Modell{sortIndicator("model")}
+          </button>
+          <button
+            onClick={() => toggleSort("purchase_price_net")}
+            className="hover:underline"
+          >
+            EK{sortIndicator("purchase_price_net")}
+          </button>
+          <button
+            onClick={() => toggleSort("sale_price_gross")}
+            className="hover:underline"
+          >
+            VK{sortIndicator("sale_price_gross")}
+          </button>
+          <button onClick={() => toggleSort("margin")} className="hover:underline">
+            Marge{sortIndicator("margin")}
+          </button>
+          <button onClick={() => toggleSort("supplier")} className="hover:underline">
+            Supplier{sortIndicator("supplier")}
+          </button>
+        </div>
+
+        {groupedModels.map((group) => {
+          const collapsed = collapsedGroups.has(group.modelName);
+          return (
+            <div key={group.modelName} className="mb-4">
+              <button
+                className="mb-2 flex w-full items-center gap-2 rounded-lg bg-slate-100 px-3 py-2 text-left text-sm font-semibold hover:bg-slate-200 dark:bg-slate-700 dark:hover:bg-slate-600"
+                onClick={() => toggleGroupCollapsed(group.modelName)}
               >
-                EK netto{sortIndicator("purchase_price_net")}
-              </th>
-              <th
-                className="cursor-pointer select-none"
-                onClick={() => toggleSort("sale_price_gross")}
-              >
-                VK brutto{sortIndicator("sale_price_gross")}
-              </th>
-              <th>VK netto</th>
-              <th className="cursor-pointer select-none" onClick={() => toggleSort("margin")}>
-                Marge{sortIndicator("margin")}
-              </th>
-              <th>Marge nach Gebühren</th>
-              <th
-                className="cursor-pointer select-none"
-                onClick={() => toggleSort("supplier")}
-              >
-                Supplier{sortIndicator("supplier")}
-              </th>
-              <th>EK-Datum</th>
-              <th></th>
-            </tr>
-          </thead>
-          <tbody>
-            {sortedModels.map((m) => {
-              const margin = calcModelMargin(m, paymentFeePercent);
-              const isCheapest = cheapestIds.has(m.id);
-              const marginNegative = margin.marginEur < 0;
-              return (
-                <tr key={m.id} className={marginNegative ? "bg-loss-light dark:bg-red-950/40" : undefined}>
-                  <td>{m.model}</td>
-                  <td>{m.storage || "–"}</td>
-                  <td>{m.color || "–"}</td>
-                  <td className={isCheapest ? "font-semibold text-profit" : undefined}>
-                    {formatEur(m.purchase_price_net)}
-                    {isCheapest && (
-                      <span
-                        className="ml-1 rounded bg-profit-light px-1.5 py-0.5 text-xs text-profit dark:bg-green-950/40"
-                        title="Günstigster EK für diese Variante"
-                      >
-                        günstigster EK
-                      </span>
-                    )}
-                  </td>
-                  <td>{formatEur(m.sale_price_gross)}</td>
-                  <td>{formatEur(margin.vkNetto)}</td>
-                  <td className={marginNegative ? "font-semibold text-loss" : ""}>
-                    {formatEur(margin.marginEur)} ({formatPercent(margin.marginPercent)})
-                  </td>
-                  <td className={margin.marginAfterFeesEur < 0 ? "font-semibold text-loss" : ""}>
-                    {formatEur(margin.marginAfterFeesEur)} (
-                    {formatPercent(margin.marginAfterFeesPercent)})
-                  </td>
-                  <td>{supplierById.get(m.supplier_id)?.company_name ?? "–"}</td>
-                  <td>{m.purchase_date}</td>
-                  <td className="whitespace-nowrap">
-                    <button
-                      className="mr-2 text-sm text-brand hover:underline"
-                      onClick={() => openEditModelForm(m)}
-                    >
-                      Bearbeiten
-                    </button>
-                    <button
-                      className="text-sm text-loss hover:underline"
-                      onClick={() => handleDeleteModel(m.id)}
-                    >
-                      Löschen
-                    </button>
-                  </td>
-                </tr>
-              );
-            })}
-            {sortedModels.length === 0 && (
-              <tr>
-                <td colSpan={11} className="py-6 text-center text-slate-400">
-                  Keine Modelle gefunden.
-                </td>
-              </tr>
-            )}
-          </tbody>
-        </table>
+                <span>{collapsed ? "▶" : "▼"}</span>
+                {group.modelName}
+                <span className="font-normal text-slate-400">
+                  ({group.items.length})
+                </span>
+              </button>
+
+              {!collapsed && (
+                <table className="data-table">
+                  <thead>
+                    <tr>
+                      <th>Speicher</th>
+                      <th>Farbe</th>
+                      <th>Spec</th>
+                      <th>EK netto</th>
+                      <th>VK brutto</th>
+                      <th>VK netto</th>
+                      <th>Marge</th>
+                      <th>Marge nach Gebühren</th>
+                      <th>Kategorien</th>
+                      <th>Supplier</th>
+                      <th>EK-Datum</th>
+                      <th></th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {group.items.map((m) => {
+                      const margin = calcModelMargin(m, paymentFeePercent);
+                      const comparison = priceComparison.get(m.id);
+                      const marginNegative = margin.marginEur < 0;
+                      const modelCategoryNames = (categoryIdsByModel.get(m.id) ?? [])
+                        .map((id) => categories.find((c) => c.id === id)?.name)
+                        .filter(Boolean);
+
+                      return (
+                        <tr
+                          key={m.id}
+                          className={
+                            marginNegative ? "bg-loss-light dark:bg-red-950/40" : undefined
+                          }
+                        >
+                          <td>{m.storage || "–"}</td>
+                          <td>{m.color || "–"}</td>
+                          <td>
+                            <span
+                              className={
+                                m.spec === "EU"
+                                  ? "rounded bg-blue-100 px-1.5 py-0.5 text-xs font-medium text-blue-700 dark:bg-blue-950/50 dark:text-blue-300"
+                                  : "rounded bg-orange-100 px-1.5 py-0.5 text-xs font-medium text-orange-700 dark:bg-orange-950/50 dark:text-orange-300"
+                              }
+                            >
+                              {m.spec}
+                            </span>
+                          </td>
+                          <td>
+                            {formatEur(m.purchase_price_net)}
+                            {comparison?.isCheapest && comparison.groupSize > 1 && (
+                              <span
+                                className="ml-1 rounded bg-profit-light px-1.5 py-0.5 text-xs font-medium text-profit dark:bg-green-950/40"
+                                title="Günstigster EK in dieser Vergleichsgruppe (gleiches Modell, Speicher, Spec)"
+                              >
+                                Bester Preis
+                              </span>
+                            )}
+                            {comparison && !comparison.isCheapest && comparison.groupSize > 1 && (
+                              <span className="ml-1 text-xs text-loss">
+                                +{formatEur(comparison.diffFromCheapest)} teurer
+                              </span>
+                            )}
+                          </td>
+                          <td>{formatEur(m.sale_price_gross)}</td>
+                          <td>{formatEur(margin.vkNetto)}</td>
+                          <td className={marginNegative ? "font-semibold text-loss" : ""}>
+                            {formatEur(margin.marginEur)} ({formatPercent(margin.marginPercent)})
+                          </td>
+                          <td
+                            className={
+                              margin.marginAfterFeesEur < 0 ? "font-semibold text-loss" : ""
+                            }
+                          >
+                            {formatEur(margin.marginAfterFeesEur)} (
+                            {formatPercent(margin.marginAfterFeesPercent)})
+                          </td>
+                          <td className="max-w-[10rem] truncate" title={modelCategoryNames.join(", ")}>
+                            {modelCategoryNames.length > 0 ? modelCategoryNames.join(", ") : "–"}
+                          </td>
+                          <td>{supplierById.get(m.supplier_id)?.company_name ?? "–"}</td>
+                          <td>{m.purchase_date}</td>
+                          <td className="whitespace-nowrap">
+                            <button
+                              className="mr-2 text-sm text-brand hover:underline"
+                              onClick={() => openEditModelForm(m)}
+                            >
+                              Bearbeiten
+                            </button>
+                            <button
+                              className="text-sm text-loss hover:underline"
+                              onClick={() => handleDeleteModel(m.id)}
+                            >
+                              Löschen
+                            </button>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              )}
+            </div>
+          );
+        })}
+
+        {groupedModels.length === 0 && (
+          <p className="py-6 text-center text-slate-400">Keine Modelle gefunden.</p>
+        )}
+
         <p className="mt-2 text-xs text-slate-400">
-          Marge nach Gebühren basiert auf der Standard-Zahlungsgebühr ({paymentFeePercent}%,
-          einstellbar unter „Einstellungen"). Rote Zeilen = negative Marge.
+          Preisvergleich und "Bester Preis" gelten je Kombination aus Modell, Speicher und
+          Spec (Farbe spielt dabei keine Rolle). Marge nach Gebühren basiert auf der
+          Standard-Zahlungsgebühr ({paymentFeePercent}%, einstellbar unter „Einstellungen").
+          Rote Zeilen = negative Marge.
         </p>
       </div>
     </div>

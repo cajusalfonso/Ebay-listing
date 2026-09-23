@@ -10,21 +10,30 @@ export default async function SupplierPage() {
     data: { user },
   } = await supabase.auth.getUser();
 
-  const [{ data: suppliers }, { data: models }, { data: settings }] =
-    await Promise.all([
-      supabase.from("suppliers").select("*").order("company_name"),
-      supabase.from("product_models").select("*").order("created_at", { ascending: false }),
-      supabase
-        .from("settings")
-        .select("*")
-        .eq("user_id", user!.id)
-        .maybeSingle(),
-    ]);
+  const [
+    { data: suppliers },
+    { data: models },
+    { data: categories },
+    { data: categoryLinks },
+    { data: settings },
+  ] = await Promise.all([
+    supabase.from("suppliers").select("*").order("company_name"),
+    supabase.from("product_models").select("*").order("created_at", { ascending: false }),
+    supabase.from("model_categories").select("*").order("name"),
+    supabase.from("model_category_links").select("*"),
+    supabase
+      .from("settings")
+      .select("*")
+      .eq("user_id", user!.id)
+      .maybeSingle(),
+  ]);
 
   return (
     <SupplierClient
       initialSuppliers={suppliers ?? []}
       initialModels={models ?? []}
+      initialCategories={categories ?? []}
+      initialCategoryLinks={categoryLinks ?? []}
       paymentFeePercent={
         settings?.default_payment_fee_percent ?? DEFAULT_PAYMENT_FEE_PERCENT
       }

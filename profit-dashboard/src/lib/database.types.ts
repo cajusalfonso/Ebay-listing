@@ -83,6 +83,8 @@ export type Supplier = {
   created_at: string;
 };
 
+export type ModelSpec = "EU" | "US";
+
 export type ProductModel = {
   id: string;
   user_id: string;
@@ -94,6 +96,22 @@ export type ProductModel = {
   sale_price_gross: number;
   purchase_date: string;
   notes: string;
+  spec: ModelSpec;
+  created_at: string;
+};
+
+export type ModelCategory = {
+  id: string;
+  user_id: string;
+  name: string;
+  created_at: string;
+};
+
+export type ModelCategoryLink = {
+  id: string;
+  user_id: string;
+  model_id: string;
+  category_id: string;
   created_at: string;
 };
 
@@ -146,6 +164,22 @@ export type Database = {
         Row: ProductModel;
         Insert: Partial<ProductModel> & { user_id: string; supplier_id: string };
         Update: Partial<ProductModel>;
+        Relationships: [];
+      };
+      model_categories: {
+        Row: ModelCategory;
+        Insert: Partial<ModelCategory> & { user_id: string };
+        Update: Partial<ModelCategory>;
+        Relationships: [];
+      };
+      model_category_links: {
+        Row: ModelCategoryLink;
+        Insert: Partial<ModelCategoryLink> & {
+          user_id: string;
+          model_id: string;
+          category_id: string;
+        };
+        Update: Partial<ModelCategoryLink>;
         Relationships: [];
       };
     };

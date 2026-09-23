@@ -337,27 +337,61 @@ export function calcModelMargin(
   return { vkNetto, marginEur, marginPercent, marginAfterFeesEur, marginAfterFeesPercent };
 }
 
-export function modelVariantKey(model: ProductModel): string {
-  return `${model.model}__${model.storage}__${model.color}`.trim().toLowerCase();
+/**
+ * Preisvergleichs-Gruppe: gleiches Modell + gleicher Speicher + gleiche Spec
+ * (EU/US). Farbe spielt fuer den Preisvergleich keine Rolle.
+ */
+export function priceComparisonKey(model: ProductModel): string {
+  return `${model.model}__${model.storage}__${model.spec}`.trim().toLowerCase();
 }
 
-/** IDs der Modell-Eintraege mit dem guenstigsten EK je Variante (Modell+Speicher+Farbe). */
-export function cheapestModelIdsByVariant(models: ProductModel[]): Set<string> {
-  const cheapestByVariant = new Map<string, number>();
+export type PriceComparison = {
+  isCheapest: boolean;
+  diffFromCheapest: number;
+  groupSize: number;
+};
+
+export function calcPriceComparison(
+  models: ProductModel[]
+): Map<string, PriceComparison> {
+  const cheapestByGroup = new Map<string, number>();
+  const sizeByGroup = new Map<string, number>();
   for (const m of models) {
-    const key = modelVariantKey(m);
-    const current = cheapestByVariant.get(key);
+    const key = priceComparisonKey(m);
+    const current = cheapestByGroup.get(key);
     if (current === undefined || m.purchase_price_net < current) {
-      cheapestByVariant.set(key, m.purchase_price_net);
+      cheapestByGroup.set(key, m.purchase_price_net);
     }
+    sizeByGroup.set(key, (sizeByGroup.get(key) ?? 0) + 1);
   }
-  const ids = new Set<string>();
+
+  const result = new Map<string, PriceComparison>();
   for (const m of models) {
-    if (cheapestByVariant.get(modelVariantKey(m)) === m.purchase_price_net) {
-      ids.add(m.id);
-    }
+    const key = priceComparisonKey(m);
+    const cheapest = cheapestByGroup.get(key)!;
+    result.set(m.id, {
+      isCheapest: m.purchase_price_net === cheapest,
+      diffFromCheapest: m.purchase_price_net - cheapest,
+      groupSize: sizeByGroup.get(key) ?? 1,
+    });
   }
-  return ids;
+  return result;
+}
+
+/** Gruppiert Modelle nach exakter Modellreihe (z.B. "S25" != "S25 Ultra"). */
+export function groupModelsByName(
+  models: ProductModel[]
+): { modelName: string; items: ProductModel[] }[] {
+  const map = new Map<string, ProductModel[]>();
+  for (const m of models) {
+    const key = m.model.trim() || "–";
+    const list = map.get(key) ?? [];
+    list.push(m);
+    map.set(key, list);
+  }
+  return Array.from(map.entries())
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([modelName, items]) => ({ modelName, items }));
 }
 
 export function formatEur(value: number): string {
