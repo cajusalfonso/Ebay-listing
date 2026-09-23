@@ -9,6 +9,7 @@ import { ThemeToggle } from "@/components/ThemeToggle";
 const NAV_ITEMS = [
   { href: "/uebersicht", label: "Übersicht", icon: "📊" },
   { href: "/bestellungen", label: "Bestellungen", icon: "🛒" },
+  { href: "/supplier", label: "Supplier & Modelle", icon: "🏭" },
   { href: "/kosten", label: "Kosten", icon: "💶" },
   { href: "/schulden", label: "Schulden", icon: "📉" },
   { href: "/kontoauszug", label: "Kontoauszug", icon: "🏦" },

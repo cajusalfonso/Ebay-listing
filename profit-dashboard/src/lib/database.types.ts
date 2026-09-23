@@ -44,6 +44,7 @@ export type Settings = {
   user_id: string;
   margin_threshold_percent: number;
   vat_rate_percent: number;
+  default_payment_fee_percent: number;
   updated_at: string;
 };
 
@@ -63,6 +64,36 @@ export type DebtPayment = {
   payment_date: string;
   amount: number;
   note: string;
+  created_at: string;
+};
+
+export type Supplier = {
+  id: string;
+  user_id: string;
+  company_name: string;
+  contact_person: string;
+  email: string;
+  phone: string;
+  messenger: string;
+  country: string;
+  vat_id: string;
+  address: string;
+  platform: string;
+  notes: string;
+  created_at: string;
+};
+
+export type ProductModel = {
+  id: string;
+  user_id: string;
+  supplier_id: string;
+  model: string;
+  storage: string;
+  color: string;
+  purchase_price_net: number;
+  sale_price_gross: number;
+  purchase_date: string;
+  notes: string;
   created_at: string;
 };
 
@@ -103,6 +134,18 @@ export type Database = {
         Row: DebtPayment;
         Insert: Partial<DebtPayment> & { user_id: string; debt_id: string };
         Update: Partial<DebtPayment>;
+        Relationships: [];
+      };
+      suppliers: {
+        Row: Supplier;
+        Insert: Partial<Supplier> & { user_id: string };
+        Update: Partial<Supplier>;
+        Relationships: [];
+      };
+      product_models: {
+        Row: ProductModel;
+        Insert: Partial<ProductModel> & { user_id: string; supplier_id: string };
+        Update: Partial<ProductModel>;
         Relationships: [];
       };
     };

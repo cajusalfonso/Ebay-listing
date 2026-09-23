@@ -4,6 +4,7 @@ import type {
   BankTransaction,
   Debt,
   DebtPayment,
+  ProductModel,
 } from "@/lib/database.types";
 
 export type OrderMargin = {
@@ -309,6 +310,54 @@ export function summarizeDebts(
   const totalDebt = debts.reduce((sum, d) => sum + d.total_amount, 0);
   const totalPaid = payments.reduce((sum, p) => sum + p.amount, 0);
   return { totalDebt, totalPaid, totalRemaining: totalDebt - totalPaid };
+}
+
+export type ModelMargin = {
+  vkNetto: number;
+  marginEur: number;
+  marginPercent: number | null;
+  marginAfterFeesEur: number;
+  marginAfterFeesPercent: number | null;
+};
+
+/** VK netto = VK brutto / 1,19 (19% USt herausgerechnet). */
+export function calcModelMargin(
+  model: ProductModel,
+  paymentFeePercent: number
+): ModelMargin {
+  const vkNetto = model.sale_price_gross / 1.19;
+  const marginEur = vkNetto - model.purchase_price_net;
+  const marginPercent = vkNetto !== 0 ? (marginEur / vkNetto) * 100 : null;
+
+  const feeAmount = model.sale_price_gross * (paymentFeePercent / 100);
+  const marginAfterFeesEur = marginEur - feeAmount;
+  const marginAfterFeesPercent =
+    vkNetto !== 0 ? (marginAfterFeesEur / vkNetto) * 100 : null;
+
+  return { vkNetto, marginEur, marginPercent, marginAfterFeesEur, marginAfterFeesPercent };
+}
+
+export function modelVariantKey(model: ProductModel): string {
+  return `${model.model}__${model.storage}__${model.color}`.trim().toLowerCase();
+}
+
+/** IDs der Modell-Eintraege mit dem guenstigsten EK je Variante (Modell+Speicher+Farbe). */
+export function cheapestModelIdsByVariant(models: ProductModel[]): Set<string> {
+  const cheapestByVariant = new Map<string, number>();
+  for (const m of models) {
+    const key = modelVariantKey(m);
+    const current = cheapestByVariant.get(key);
+    if (current === undefined || m.purchase_price_net < current) {
+      cheapestByVariant.set(key, m.purchase_price_net);
+    }
+  }
+  const ids = new Set<string>();
+  for (const m of models) {
+    if (cheapestByVariant.get(modelVariantKey(m)) === m.purchase_price_net) {
+      ids.add(m.id);
+    }
+  }
+  return ids;
 }
 
 export function formatEur(value: number): string {

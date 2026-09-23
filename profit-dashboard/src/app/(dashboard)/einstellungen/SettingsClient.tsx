@@ -7,15 +7,20 @@ export function SettingsClient({
   userId,
   initialMarginThreshold,
   initialVatRate,
+  initialPaymentFeePercent,
 }: {
   userId: string;
   initialMarginThreshold: number;
   initialVatRate: number;
+  initialPaymentFeePercent: number;
 }) {
   const [marginThreshold, setMarginThreshold] = useState(
     initialMarginThreshold
   );
   const [vatRate, setVatRate] = useState(initialVatRate);
+  const [paymentFeePercent, setPaymentFeePercent] = useState(
+    initialPaymentFeePercent
+  );
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -32,6 +37,7 @@ export function SettingsClient({
       user_id: userId,
       margin_threshold_percent: marginThreshold,
       vat_rate_percent: vatRate,
+      default_payment_fee_percent: paymentFeePercent,
       updated_at: new Date().toISOString(),
     });
 
@@ -72,6 +78,22 @@ export function SettingsClient({
             className="input"
             value={vatRate}
             onChange={(e) => setVatRate(parseFloat(e.target.value) || 0)}
+          />
+        </div>
+
+        <div>
+          <label className="label">
+            Standard-Zahlungsgebühr (%) – für „Marge nach Gebühren" bei
+            Supplier-Modellen
+          </label>
+          <input
+            type="number"
+            step="0.1"
+            className="input"
+            value={paymentFeePercent}
+            onChange={(e) =>
+              setPaymentFeePercent(parseFloat(e.target.value) || 0)
+            }
           />
         </div>
 

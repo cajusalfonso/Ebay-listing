@@ -36,3 +36,11 @@ export const CURRENCIES = ["EUR", "USD", "GBP", "CNY", "CHF"] as const;
 
 export const DEFAULT_MARGIN_THRESHOLD = 10;
 export const DEFAULT_VAT_RATE = 19;
+export const DEFAULT_PAYMENT_FEE_PERCENT = 2.4;
+
+export const SUPPLIER_PLATFORMS = [
+  "AIKON",
+  "Handelot",
+  "Discord",
+  "Sonstige",
+] as const;

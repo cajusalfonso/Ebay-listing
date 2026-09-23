@@ -1,6 +1,10 @@
 import { createClient } from "@/lib/supabase/server";
 import { SettingsClient } from "./SettingsClient";
-import { DEFAULT_MARGIN_THRESHOLD, DEFAULT_VAT_RATE } from "@/lib/constants";
+import {
+  DEFAULT_MARGIN_THRESHOLD,
+  DEFAULT_VAT_RATE,
+  DEFAULT_PAYMENT_FEE_PERCENT,
+} from "@/lib/constants";
 
 export const dynamic = "force-dynamic";
 
@@ -23,6 +27,9 @@ export default async function EinstellungenPage() {
         settings?.margin_threshold_percent ?? DEFAULT_MARGIN_THRESHOLD
       }
       initialVatRate={settings?.vat_rate_percent ?? DEFAULT_VAT_RATE}
+      initialPaymentFeePercent={
+        settings?.default_payment_fee_percent ?? DEFAULT_PAYMENT_FEE_PERCENT
+      }
     />
   );
 }
