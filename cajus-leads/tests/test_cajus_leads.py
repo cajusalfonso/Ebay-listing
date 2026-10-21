@@ -153,6 +153,11 @@ class EndToEnd(unittest.TestCase):
         self.assertEqual(self.cl.website_aus_email("salon@gmx.de"), "")
         self.assertEqual(self.cl.website_aus_email(""), "")
 
+    def test_ort_kurz(self):
+        self.assertEqual(self.cl.ort_kurz("Frankfurt am Main"), "Frankfurt")
+        self.assertEqual(self.cl.ort_kurz("Offenbach a. M."), "Offenbach")
+        self.assertEqual(self.cl.ort_kurz("Hanau"), "Hanau")
+
     def test_ablauf(self):
         out = self.run_cli("suche", "--radius-km", "5")
         self.assertIn("1 Ketten ausgelassen", out)

@@ -579,18 +579,27 @@ def cmd_suche(args):
 # 3. ANALYSE
 # ---------------------------------------------------------------------------
 
-def reverse_stadtteil(http: Http, lead: dict) -> str:
+def reverse_ort(http: Http, lead: dict) -> None:
+    """Stadtteil und Ort über Nominatim ergänzen, falls sie in OSM fehlen."""
     if not (lead.get("lat") and lead.get("lon")):
-        return ""
+        return
     url = f"{NOMINATIM_URL}/reverse?" + urlencode({"lat": lead["lat"], "lon": lead["lon"], "format": "jsonv2", "zoom": 16})
     a = http.get(url)
     if not a.ok:
-        return ""
+        return
     try:
         adr = json.loads(a.text).get("address", {})
     except ValueError:
-        return ""
-    return adr.get("suburb") or adr.get("city_district") or adr.get("quarter") or ""
+        return
+    if not lead.get("stadtteil"):
+        lead["stadtteil"] = adr.get("suburb") or adr.get("city_district") or adr.get("quarter") or ""
+    if not lead.get("ort"):
+        lead["ort"] = adr.get("city") or adr.get("town") or adr.get("village") or ""
+
+
+def ort_kurz(ort: str) -> str:
+    """„Frankfurt am Main“ → „Frankfurt“, „Offenbach a. M.“ → „Offenbach“."""
+    return re.split(r"\s+(?:am|an der|a\.|im|/)\s*", ort or "")[0].strip()
 
 
 def befund(key, kategorie, gewicht, text, beleg, sicher=True, **werte):
@@ -783,11 +792,11 @@ def analysiere_website(http: Http, lead: dict) -> dict:
     desc = home.meta.get("description", "").strip()
     c["Title"] = title or "(leer)"
     c["Meta-Description"] = desc[:120] or "(fehlt)"
-    ortsnamen = [o for o in (ort, stadtteil) if o]
+    ortsnamen = [o for o in (ort_kurz(ort), stadtteil) if o]
     if not title or (ortsnamen and not any(o.lower() in title.lower() for o in ortsnamen)):
         erg["befunde"].append(befund("title_schwach", "Auffindbarkeit", 40,
             f"Seitentitel „{title or '(leer)'}“ enthält weder Stadt noch Stadtteil.", f"<title>{title}</title>",
-            title=title or lead["name"], ort=stadtteil or ort or "Ihrer Stadt"))
+            title=title or lead["name"], ort=stadtteil or ort_kurz(ort) or "Rhein-Main"))
     if not desc:
         erg["befunde"].append(befund("keine_description", "Auffindbarkeit", 35,
             "Keine Meta-Description – Google zeigt einen zufälligen Textausschnitt.", "<meta name=\"description\"> fehlt"))
@@ -1002,7 +1011,7 @@ def woerter(text: str) -> int:
 def schreibe_email(lead: dict, top: list, plus: dict | None, v: Varianten, ohne_website=False) -> tuple[str, str]:
     seed = lead["id"]
     domain = urlparse(lead.get("website", "")).hostname or ""
-    felder = {"salon": lead["name"], "domain": domain.removeprefix("www."), "stadt": lead.get("ort") or "Ihrer Stadt",
+    felder = {"salon": lead["name"], "domain": domain.removeprefix("www."), "stadt": ort_kurz(lead.get("ort")) or "Rhein-Main",
               "stadtteil": lead.get("stadtteil") or lead.get("ort") or "in der Nähe"}
     anrede = v.nimm("anrede", ANREDE, seed).format(**felder)
     if ohne_website:
@@ -1086,8 +1095,8 @@ def cmd_analyse(args):
         lead = index[lead["id"]]
         ordner = OUTREACH_DIR / lead["ordner"]
         ordner.mkdir(parents=True, exist_ok=True)
-        if not lead.get("stadtteil"):
-            lead["stadtteil"] = reverse_stadtteil(http, lead)
+        if not lead.get("stadtteil") or not lead.get("ort"):
+            reverse_ort(http, lead)
         ohne_website = not lead.get("website")
         erg = {"befunde": [], "positiv": [], "checks": {}, "seiten": []} if ohne_website else analysiere_website(http, lead)
         top, plus = waehle(erg)
