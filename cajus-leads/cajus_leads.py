@@ -59,8 +59,11 @@ MAX_BYTES = 3_000_000
 OVERPASS_URLS = [u for u in os.environ.get("CAJUS_OVERPASS_URL", "").split(",") if u] or [
     "https://overpass-api.de/api/interpreter",
     "https://overpass.kumi.systems/api/interpreter",
+    "https://overpass.private.coffee/api/interpreter",
     "https://maps.mail.ru/osm/tools/overpass/api/interpreter",
 ]
+# Overpass lehnt manche Browser-ähnlichen Kennungen ab (HTTP 406) → eigene, klare Kennung
+OVERPASS_HEADERS = {"User-Agent": f"cajus-leads/1.0 ({ABSENDER_EMAIL})", "Accept": "application/json, */*"}
 NOMINATIM_URL = os.environ.get("CAJUS_NOMINATIM_URL", "https://nominatim.openstreetmap.org")
 
 # Scoring (0–100) laut Vorgabe
@@ -151,7 +154,8 @@ class Http:
 
     def get(self, url, data=None, timeout=None, headers=None) -> Antwort:
         self._warte()
-        kopf = {"User-Agent": USER_AGENT, "Accept-Language": "de-DE,de;q=0.9"}
+        kopf = {"User-Agent": USER_AGENT, "Accept": "text/html,application/xhtml+xml,*/*;q=0.8",
+                "Accept-Language": "de-DE,de;q=0.9"}
         kopf.update(headers or {})
         req = urllib.request.Request(url, data=data, headers=kopf)
         t0 = time.monotonic()
@@ -391,7 +395,11 @@ def overpass(http: Http, lat: float, lon: float, radius_m: int) -> list[dict]:
     query = (f'[out:json][timeout:{OVERPASS_TIMEOUT}];'
              f'nwr["shop"="hairdresser"](around:{radius_m},{lat},{lon});out center tags;')
     for url in OVERPASS_URLS:
-        a = http.get(url, data=urlencode({"data": query}).encode(), timeout=OVERPASS_TIMEOUT + 10)
+        a = http.get(url, data=urlencode({"data": query}).encode(), timeout=OVERPASS_TIMEOUT + 10,
+                     headers=OVERPASS_HEADERS)
+        if not a.ok and 400 <= a.status < 500:  # manche Server wollen GET statt POST
+            a = http.get(url + "?" + urlencode({"data": query}), timeout=OVERPASS_TIMEOUT + 10,
+                         headers=OVERPASS_HEADERS)
         if a.ok:
             try:
                 return json.loads(a.text)["elements"]
