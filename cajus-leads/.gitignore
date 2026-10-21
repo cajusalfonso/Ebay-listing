@@ -1,0 +1,9 @@
+# Zugangsdaten
+.env
+# Lead-Daten (enthalten Kontaktdaten Dritter – nicht ins Git)
+leads.csv
+ohne_email.csv
+kontaktiert.csv
+outreach/
+*.tmp
+__pycache__/
