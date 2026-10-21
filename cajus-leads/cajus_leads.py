@@ -436,6 +436,18 @@ def lead_aus_osm(el: dict) -> dict | None:
     }
 
 
+FREEMAIL = {"gmail.com", "googlemail.com", "gmx.de", "gmx.net", "gmx.at", "web.de", "t-online.de", "yahoo.com",
+            "yahoo.de", "hotmail.com", "hotmail.de", "outlook.com", "outlook.de", "live.de", "live.com", "icloud.com",
+            "me.com", "aol.com", "aol.de", "freenet.de", "arcor.de", "posteo.de", "mail.de", "online.de", "yandex.com",
+            "protonmail.com", "proton.me", "email.de", "kabelmail.de", "vodafone.de", "1und1.de"}
+
+
+def website_aus_email(email: str) -> str:
+    """info@salon-xy.de → https://salon-xy.de (nicht bei Gmail, GMX & Co.)."""
+    domain = email.split("@")[-1].lower() if "@" in email else ""
+    return f"https://{domain}" if domain and domain not in FREEMAIL else ""
+
+
 def hole_startseite(http: Http, website: str) -> Antwort:
     a = http.get(website)
     if not a.ok and website.startswith("https://"):
@@ -449,6 +461,11 @@ def vorab_check(http: Http, lead: dict) -> None:
     """Startseite (+ ggf. Impressum) abrufen, Merkmale + Score setzen."""
     for k in ("https", "mobil", "baukasten", "online_buchung", "copyright_jahr", "website_status"):
         lead[k] = ""
+    # In OSM fehlt oft nur der Website-Eintrag: eigene E-Mail-Domain → Website dort versuchen
+    if not lead["website"] and website_aus_email(lead.get("email", "")):
+        versuch = website_aus_email(lead["email"])
+        if hole_startseite(http, versuch).ok:
+            lead["website"] = versuch
     if lead["website"]:
         a = hole_startseite(http, lead["website"])
         if not a.ok:
@@ -1087,6 +1104,8 @@ def cmd_analyse(args):
             sub, body = schreibe_email(lead, top, plus, v, ohne_website)
             email_pfad.write_text(f"{AUTO_MARKER}\nAn: {lead.get('email', '')}\nBetreff: {sub}\n\n{body}\n", encoding="utf-8")
             info = f"{woerter(body.split(chr(10) + 'Viele Grüße')[0])} Wörter"
+            if ohne_website:
+                info += " – KEINE Website laut OpenStreetMap: vor dem Senden kurz googeln!"
         print(f"  [{i}/{len(auswahl)}] {lead['name'][:40]:40} → outreach/{lead['ordner']}/  ({info})")
     speichere_leads(list(index.values()))
     print("\nFertig. Bitte jede email.md kurz lesen, bevor Sie Entwürfe anlegen.")

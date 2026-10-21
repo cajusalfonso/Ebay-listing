@@ -148,6 +148,11 @@ class EndToEnd(unittest.TestCase):
     def leads(self):
         return {l["name"]: l for l in self.cl.lese_csv(self.cl.LEADS_CSV)}
 
+    def test_website_aus_email(self):
+        self.assertEqual(self.cl.website_aus_email("info@divinecut.de"), "https://divinecut.de")
+        self.assertEqual(self.cl.website_aus_email("salon@gmx.de"), "")
+        self.assertEqual(self.cl.website_aus_email(""), "")
+
     def test_ablauf(self):
         out = self.run_cli("suche", "--radius-km", "5")
         self.assertIn("1 Ketten ausgelassen", out)
