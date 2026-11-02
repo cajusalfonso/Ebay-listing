@@ -23,6 +23,7 @@ export default tseslint.config(
       'components/**',
       'lib/**',
       'middleware.ts',
+      'arbisync/**',
     ],
   },
   js.configs.recommended,

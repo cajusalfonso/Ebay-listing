@@ -1,0 +1,20 @@
+# Cloudflare-Konfiguration für ArbiSync.
+# Hier stehen KEINE Passwörter oder Keys – die liegen nur in .env (lokal)
+# bzw. als "Secrets" bei Cloudflare (live).
+
+name = "arbisync"
+main = "src/index.ts"
+compatibility_date = "2025-10-01"
+compatibility_flags = ["nodejs_compat"]
+
+# Alle 5 Minuten: Bestellungen abholen, Schutzregeln, Nachtmodus, Erinnerungen.
+[triggers]
+crons = ["*/5 * * * *"]
+
+# Kostenlose Datenbank (Cloudflare D1).
+# database_id trägst du in Modul 8 (Deployment) ein – lokal funktioniert der Platzhalter.
+[[d1_databases]]
+binding = "DB"
+database_name = "arbisync-db"
+database_id = "00000000-0000-0000-0000-000000000000"
+migrations_dir = "migrations"
